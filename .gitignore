@@ -1,0 +1,15 @@
+# Local build and temporary files
+build/
+work/
+*.pdb
+*.ilk
+*.exp
+*.lib
+
+# IDE / OS files
+.vs/
+.idea/
+.vscode/
+Thumbs.db
+Desktop.ini
+

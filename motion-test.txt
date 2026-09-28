@@ -1,0 +1,5 @@
+passed=1
+bridge_m=3
+spindle_m=0.65
+spindle_height_m=0.754551
+lift_delta_m=0

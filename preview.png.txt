@@ -1,0 +1,6 @@
+fps=63
+x=1929.16
+y=3036.03
+z=224.314
+modelState=demo
+capture=1

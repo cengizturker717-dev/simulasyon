@@ -1,0 +1,7 @@
+passed=1
+samples=169
+medianFrameMs=34.764
+p95FrameMs=54.1524
+maxFrameMs=1040.14
+finalDistance=11500
+clipFar=60000

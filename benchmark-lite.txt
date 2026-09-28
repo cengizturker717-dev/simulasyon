@@ -1,0 +1,4 @@
+frames=624
+avg_fps=62.5098
+median_ms=15.95
+p95_ms=19.3636
