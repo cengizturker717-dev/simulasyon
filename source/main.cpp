@@ -74,7 +74,7 @@ int main(int argc,char **argv) {
     if(args.contains("--self-test")) {
         motion.configureAxisRanges(-34,5235,0,-240,2310,100,-295,46,-270);
         motion.setLiveAxes(0,100,-270);
-        if(motion.x()!=0 || motion.y()!=0 || motion.z()!=0 || !motion.liveMode()) return 9;
+        if(motion.x()!=0 || motion.y()!=1050 || motion.z()!=60 || !motion.liveMode()) return 9;
         motion.endLive();
         motion.setAxis(0,-10); if(motion.x()!=0) return 10;
         motion.setAxis(1,9000); if(motion.y()!=2100) return 11;

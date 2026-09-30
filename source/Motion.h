@@ -58,10 +58,11 @@ public:
     Q_INVOKABLE void setLiveAxes(double rawX,double rawY,double rawZ) {
         if(!std::isfinite(rawX)||!std::isfinite(rawY)||!std::isfinite(rawZ))return;
         pause();route.clear();live=true;isCutting=false;
-        // QRIP is the controller's referenced/home position. It must be visual zero.
-        px=std::clamp((rawX-refX)/(maxX-refX)*3660.0,0.0,3660.0);
-        py=std::clamp((rawY-refY)/(maxY-refY)*2100.0,0.0,2100.0);
-        pz=std::clamp((rawZ-refZ)/(maxZ-refZ)*120.0,0.0,120.0);
+        // QRIP is the controller's referenced/home position. The imported CAD
+        // assembly is mounted at X=0, Y=1050, Z=60 in model coordinates.
+        px=std::clamp(rawX-refX,0.0,3660.0);
+        py=std::clamp(1050.0+rawY-refY,0.0,2100.0);
+        pz=std::clamp(60.0+rawZ-refZ,0.0,120.0);
         emit changed();
     }
     Q_INVOKABLE void endLive() {if(live){live=false;emit changed();}}
