@@ -30,9 +30,10 @@ public:
     int frontLeftOrigin()const{return frontLeft;} int frontRightOrigin()const{return frontRight;}
     double axisMin(int i)const{return i>=0&&i<mins.size()?mins[i]:0;}
     double axisMax(int i)const{return i>=0&&i<maxs.size()?maxs[i]:1;}
+    double axisReference(int i)const{return i>=0&&i<references.size()?references[i]:0;}
     void setRoot(const QString& value){base=QDir::cleanPath(value);refresh();}
     Q_INVOKABLE void refresh(){
-        axisRows.clear();originRows.clear();toolRows.clear();magazineRows.clear();mins.clear();maxs.clear();
+        axisRows.clear();originRows.clear();toolRows.clear();magazineRows.clear();mins.clear();maxs.clear();references.clear();
         const QString data=base+"/Dati/";
         const QString axisFile=data+"datassi_01_dat.ini",originFile=data+"datvari_dat.ini";
         const QString generalFile=data+"fametec_dat.ini",toolFile=data+"datpunt_dat.ini",magFile=data+"datmag_01_dat.ini";
@@ -43,7 +44,7 @@ public:
         for(const QString& g:ax.childGroups()) if(g.startsWith("AX_")){
             ax.beginGroup(g);int index=g.mid(3).toInt();double origin=ax.value("ORIG").toDouble();
             double lo=ax.value("FINDW").toDouble(),hi=ax.value("FINUP").toDouble(),recovery=ax.value("QRIP").toDouble();ax.endGroup();
-            while(mins.size()<=index){mins.append(0);maxs.append(1);}mins[index]=lo;maxs[index]=hi;
+            while(mins.size()<=index){mins.append(0);maxs.append(1);references.append(0);}mins[index]=lo;maxs[index]=hi;references[index]=recovery;
             axisRows.append(QVariantMap{{"index",index},{"name",index==0?"X":index==1?"Y":index==2?"Z":QString("A%1").arg(index)},
                 {"machineZero",origin},{"min",lo},{"max",hi},{"recovery",recovery}});
         }
@@ -77,7 +78,7 @@ public:
 signals:void changed();
 private:
     QString base="C:/CNI/Ncone/MachineData/POYRAZ_VIGOR2136_ETH",message;
-    QVariantList axisRows,originRows,toolRows,magazineRows;QList<double> mins,maxs;
+    QVariantList axisRows,originRows,toolRows,magazineRows;QList<double> mins,maxs,references;
     int rearLeft=0,rearRight=0,frontLeft=0,frontRight=0;
     QTimer poll;QString signature;
     QString fileSignature()const{

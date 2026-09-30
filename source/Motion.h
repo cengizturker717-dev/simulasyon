@@ -50,16 +50,18 @@ public:
     bool programMode() const {return !route.isEmpty();}
     bool cutting() const {return isCutting;}
     bool liveMode() const {return live;}
-    void configureAxisRanges(double xMin,double xMax,double yMin,double yMax,double zMin,double zMax){
-        if(xMax>xMin&&yMax>yMin&&zMax>zMin){minX=xMin;maxX=xMax;minY=yMin;maxY=yMax;minZ=zMin;maxZ=zMax;}
+    void configureAxisRanges(double xMin,double xMax,double xReference,double yMin,double yMax,double yReference,double zMin,double zMax,double zReference){
+        if(xMax>xReference&&xReference>=xMin&&yMax>yReference&&yReference>=yMin&&zMax>zReference&&zReference>=zMin){
+            minX=xMin;maxX=xMax;refX=xReference;minY=yMin;maxY=yMax;refY=yReference;minZ=zMin;maxZ=zMax;refZ=zReference;
+        }
     }
     Q_INVOKABLE void setLiveAxes(double rawX,double rawY,double rawZ) {
         if(!std::isfinite(rawX)||!std::isfinite(rawY)||!std::isfinite(rawZ))return;
         pause();route.clear();live=true;isCutting=false;
-        // Map the limits read from Dati/datassi_01_dat.ini into the model strokes.
-        px=std::clamp((rawX-minX)/(maxX-minX)*3660.0,0.0,3660.0);
-        py=std::clamp((rawY-minY)/(maxY-minY)*2100.0,0.0,2100.0);
-        pz=std::clamp((rawZ-minZ)/(maxZ-minZ)*120.0,0.0,120.0);
+        // QRIP is the controller's referenced/home position. It must be visual zero.
+        px=std::clamp((rawX-refX)/(maxX-refX)*3660.0,0.0,3660.0);
+        py=std::clamp((rawY-refY)/(maxY-refY)*2100.0,0.0,2100.0);
+        pz=std::clamp((rawZ-refZ)/(maxZ-refZ)*120.0,0.0,120.0);
         emit changed();
     }
     Q_INVOKABLE void endLive() {if(live){live=false;emit changed();}}
@@ -100,5 +102,5 @@ private:
     bool isCutting=false,live=false;
     qsizetype next=1;
     double px=0,py=1050,pz=60,plift=0,rate=1,phase=0;
-    double minX=-34,maxX=5235,minY=-240,maxY=2310,minZ=-295,maxZ=46;
+    double minX=-34,maxX=5235,refX=0,minY=-240,maxY=2310,refY=100,minZ=-295,maxZ=46,refZ=-270;
 };

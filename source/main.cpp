@@ -27,7 +27,10 @@ int main(int argc,char **argv) {
     Motion motion;
     Pcni pcni;
     MachineData machineData;
-    auto applyRanges=[&]{motion.configureAxisRanges(machineData.axisMin(0),machineData.axisMax(0),machineData.axisMin(1),machineData.axisMax(1),machineData.axisMin(2),machineData.axisMax(2));};
+    auto applyRanges=[&]{motion.configureAxisRanges(
+        machineData.axisMin(0),machineData.axisMax(0),machineData.axisReference(0),
+        machineData.axisMin(1),machineData.axisMax(1),machineData.axisReference(1),
+        machineData.axisMin(2),machineData.axisMax(2),machineData.axisReference(2));};
     QObject::connect(&machineData,&MachineData::changed,&motion,applyRanges);applyRanges();
     LiveCni cni;
     QObject::connect(&cni,&LiveCni::axes,&motion,&Motion::setLiveAxes);
@@ -69,6 +72,10 @@ int main(int argc,char **argv) {
         return pcni.programs().isEmpty()||failed?40:0;
     }
     if(args.contains("--self-test")) {
+        motion.configureAxisRanges(-34,5235,0,-240,2310,100,-295,46,-270);
+        motion.setLiveAxes(0,100,-270);
+        if(motion.x()!=0 || motion.y()!=0 || motion.z()!=0 || !motion.liveMode()) return 9;
+        motion.endLive();
         motion.setAxis(0,-10); if(motion.x()!=0) return 10;
         motion.setAxis(1,9000); if(motion.y()!=2100) return 11;
         motion.setAxis(2,900); if(motion.z()!=120) return 12;
