@@ -16,6 +16,7 @@
 #include "Pcni.h"
 #include "StockGeometry.h"
 #include "LiveCni.h"
+#include "MachineData.h"
 
 int main(int argc,char **argv) {
     QGuiApplication app(argc,argv);
@@ -25,6 +26,9 @@ int main(int argc,char **argv) {
     const auto args=app.arguments();
     Motion motion;
     Pcni pcni;
+    MachineData machineData;
+    auto applyRanges=[&]{motion.configureAxisRanges(machineData.axisMin(0),machineData.axisMax(0),machineData.axisMin(1),machineData.axisMax(1),machineData.axisMin(2),machineData.axisMax(2));};
+    QObject::connect(&machineData,&MachineData::changed,&motion,applyRanges);applyRanges();
     LiveCni cni;
     QObject::connect(&cni,&LiveCni::axes,&motion,&Motion::setLiveAxes);
     QObject::connect(&cni,&LiveCni::disconnected,&motion,&Motion::endLive);
@@ -49,7 +53,11 @@ int main(int argc,char **argv) {
         stock.cut(0,600,2700,600,false);stock.flush();qInfo()<<"stock update ms"<<t.elapsed();return 0;
     }
     const int dataIndex=args.indexOf("--machine-data");
-    if(dataIndex>=0 && dataIndex+1<args.size()) pcni.setRoot(args[dataIndex+1]);
+    if(dataIndex>=0 && dataIndex+1<args.size()){pcni.setRoot(args[dataIndex+1]);machineData.setRoot(args[dataIndex+1]);}
+    if(args.contains("--machine-data-test")){
+        qInfo()<<machineData.status()<<"rear origins"<<machineData.rearLeftOrigin()<<machineData.rearRightOrigin();
+        return machineData.axes().size()>=3&&machineData.origins().size()>=1&&machineData.tools().size()>=1?0:41;
+    }
     if(args.contains("--pcni-test")) {
         int failed=0,labels=0,points=0;
         for(const auto& name:pcni.programs()) {
@@ -90,6 +98,7 @@ int main(int argc,char **argv) {
     engine.rootContext()->setContextProperty("pcni",&pcni);
     engine.rootContext()->setContextProperty("cni",&cni);
     engine.rootContext()->setContextProperty("stock",&stock);
+    engine.rootContext()->setContextProperty("machineData",&machineData);
     QUrl startupModel;
     const int modelIndex=args.indexOf("--model");
     if(modelIndex>=0 && modelIndex+1<args.size()) {
@@ -226,6 +235,7 @@ int main(int argc,char **argv) {
     }
     if(args.contains("--demo")) motion.play();
     if(args.contains("--cni-live")) cni.start();
+    if(args.contains("--show-machine-data")) QTimer::singleShot(1000,&app,[&]{QMetaObject::invokeMethod(window,"showMachineData");});
     if(args.contains("--inspection")) QTimer::singleShot(12000,&app,[&]{QMetaObject::invokeMethod(window,"inspectionView");});
     const int captureIndex=args.indexOf("--capture");
     if(captureIndex>=0 && captureIndex+1<args.size()) {
@@ -252,6 +262,11 @@ int main(int argc,char **argv) {
                     << "\ncniRawX=" << cni.property("x").toDouble()
                     << "\ncniRawY=" << cni.property("y").toDouble()
                     << "\ncniRawZ=" << cni.property("z").toDouble()
+                    << "\ncniOriginNumber=" << cni.originNumber()
+                    << "\ncniOriginX=" << cni.property("originX").toDouble()
+                    << "\ncniOriginY=" << cni.property("originY").toDouble()
+                    << "\ncniOriginZ=" << cni.property("originZ").toDouble()
+                    << "\ncniToolReference=" << cni.property("toolReference").toInt()
                     << "\nmodelState=" << window->property("modelState").toString()
                     << "\ncapture=" << ok << "\n";
             }

@@ -14,6 +14,10 @@ Uygulama `SharedAx` üzerinden ilk üç kartezyen eksenin gerçek konumunu 100 m
 
 Görüntü eşlemesi, mevcut Vigor makine datasındaki limitleri (X -34…5235, Y -240…2310, Z -295…46) modelin görsel hareket aralığına ölçekler. Ham değerlerin doğru okunduğu simülatörle doğrulandı. Fiziksel makinede yön, sıfır noktası ve strok eşlemesi kuru çalıştırmada ayrıca doğrulanmalıdır.
 
+Canlı bağlantı ayrıca CNI merkezinden aktif orijin numarası ile ORX/ORY/ORZ ofsetlerini okur. Ekranda ham makine koordinatı, aktif orijin ofseti ve bunların farkı olan parça koordinatı ayrı gösterilir. Böylece mekanik makine sıfırı ile program/parça sıfırı birbirine karıştırılmaz.
+
+`Makine datası / takımlar` ekranı `Dati/datassi_01_dat.ini`, `datvari_dat.ini`, `fametec_dat.ini`, `datpunt_dat.ini` ve `datmag_01_dat.ini` dosyalarını salt okunur açar. Mekanik eksen sıfırları ve limitler, ORIG tabloları, yapılandırılmış ön/arka orijin numaraları, takım çapı/boyu ve `PMAG` ile atanmış magazin cepleri gösterilir. NcOne takım sayfasında bir takımın magazin ataması değiştiğinde `Dati'yi yenile` ile tekrar okunur.
+
 ## PCNI ve etiket önizlemesi
 
 `PCNI programları / etiketler` düğmesiyle makine datasındaki `User/Prog/*.pcni` dosyalarını seçin. `Programı oku` plaka üzerindeki X/Y yolunu ve etiket konumlarını gösterir. Etiketler `User/Import/<program>_<numara>.bmp` (veya png/jpg) adından eşleştirilir. Başka bilgisayarda `Klasör seç` ile `User` klasörünün üstündeki makine data klasörünü seçin; üretim dosyaları bu repoya kopyalanmaz.

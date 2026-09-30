@@ -61,6 +61,7 @@ ApplicationWindow {
         navigation.setDistance(root.homeDistance)
     }
     function showPcni() { programDialog.open() }
+    function showMachineData() { dataDialog.open() }
     function inspectionView() {
         orbit.position=Qt.vector3d(540,780,0)
         orbit.eulerRotation=Qt.vector3d(-25,25,0)
@@ -114,7 +115,11 @@ ApplicationWindow {
     FolderDialog {
         id: machineFolder
         title: "User klasörünü içeren makine data klasörünü seçin"
-        onAccepted: { motion.clearPath(); pcni.root=decodeURIComponent(selectedFolder.toString().replace(/^file:\/\/\//, "")) }
+        onAccepted: {
+            motion.clearPath()
+            let path=decodeURIComponent(selectedFolder.toString().replace(/^file:\/\/\//, ""))
+            pcni.root=path; machineData.root=path
+        }
     }
     Dialog {
         id: cniDialog
@@ -128,11 +133,57 @@ ApplicationWindow {
             Label { text: "X: " + (cni.fresh ? cni.x.toFixed(3)+" mm" : "—"); font.pixelSize: 23 }
             Label { text: "Y: " + (cni.fresh ? cni.y.toFixed(3)+" mm" : "—"); font.pixelSize: 23 }
             Label { text: "Z: " + (cni.fresh ? cni.z.toFixed(3)+" mm" : "—"); font.pixelSize: 23 }
-            Label { Layout.fillWidth: true; text: "Ham değerleri NcOne eksen ekranıyla karşılaştırın. 3D model, makine datasındaki eksen limitlerine göre ölçeklenir. NcOne'a komut gönderilmez."; wrapMode: Text.Wrap }
+            Rectangle { Layout.fillWidth: true; height: 1; color: "#405067" }
+            Label { Layout.fillWidth: true; text: cni.fresh ? "Merkez "+cni.center+" · aktif ORIG"+cni.originNumber+" · takım referansı "+cni.toolReference : "Aktif merkez/orijin bekleniyor"; color: "#82afff"; font.bold: true }
+            Label { Layout.fillWidth: true; text: cni.fresh ? "Orijin ofseti  X "+cni.originX.toFixed(3)+"  Y "+cni.originY.toFixed(3)+"  Z "+cni.originZ.toFixed(3)+" mm" : ""; wrapMode: Text.Wrap }
+            Label { Layout.fillWidth: true; text: cni.fresh ? "Parça koordinatı  X "+cni.workX.toFixed(3)+"  Y "+cni.workY.toFixed(3)+"  Z "+cni.workZ.toFixed(3)+" mm" : ""; wrapMode: Text.Wrap; color: "#9ee1b7" }
+            Label { Layout.fillWidth: true; text: "3D model, Dati/datassi eksen limitlerine göre ölçeklenir. Aktif orijin CNI merkez verisinden okunur. NcOne'a komut gönderilmez."; wrapMode: Text.Wrap }
             RowLayout {
                 Button { text: "CNI verisini oku"; enabled: !cni.active; onClicked: cni.start() }
                 Button { text: "Bağlantıyı kes"; enabled: cni.active; onClicked: cni.stop() }
             }
+        }
+    }
+    Dialog {
+        id: dataDialog
+        title: "NcOne makine datası — salt okunur"
+        anchors.centerIn: parent; width: Math.min(root.width-60,900); height: Math.min(root.height-60,720); modal: true
+        standardButtons: Dialog.Close
+        contentItem: ColumnLayout {
+            spacing: 10
+            Label { Layout.fillWidth: true; text: machineData.root; elide: Text.ElideMiddle; color: "#aab9ce" }
+            Label { Layout.fillWidth: true; text: machineData.status; color: "#9ee1b7" }
+            Label { Layout.fillWidth: true; text: "Yapılandırılmış orijinler — arka: sol "+machineData.rearLeftOrigin+", sağ "+machineData.rearRightOrigin+" · ön: sol "+machineData.frontLeftOrigin+", sağ "+machineData.frontRightOrigin; wrapMode: Text.Wrap }
+            TabBar { id: dataTabs; Layout.fillWidth: true; TabButton { text: "Orijinler" } TabButton { text: "Magazin" } TabButton { text: "Tüm takımlar" } }
+            StackLayout {
+                Layout.fillWidth: true; Layout.fillHeight: true; currentIndex: dataTabs.currentIndex
+                ListView {
+                    clip: true; spacing: 4; model: machineData.origins
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: ListView.view.width; height: 42; radius: 5; color: modelData.number===cni.originNumber ? "#244f8f" : modelData.disabled ? "#202833" : "#253c35"
+                        Label { anchors.fill: parent; anchors.margins: 9; text: modelData.name+"   X "+modelData.x.toFixed(2)+"   Y "+modelData.y.toFixed(2)+"   Z "+modelData.z.toFixed(2)+" mm"+(modelData.mirrorX?" · X ayna":"")+(modelData.translateY?" · Y öteleme":"")+(modelData.disabled?" · pasif":"")+(modelData.number===cni.originNumber?" · CNI AKTİF":""); color: modelData.disabled ? "#8695a6" : "#e5edf7" }
+                    }
+                }
+                ListView {
+                    clip: true; spacing: 4; model: machineData.magazineTools
+                    Label { anchors.centerIn: parent; visible: machineData.magazineTools.length===0; text: "Dati takım tablosunda magazin cebine atanmış takım yok"; color: "#edbe75" }
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: ListView.view.width; height: 42; radius: 5; color: "#253247"
+                        Label { anchors.fill: parent; anchors.margins: 9; text: "Magazin "+modelData.magazine+" · Cep "+modelData.pocket+"   "+modelData.name+"   Ø"+modelData.diameter.toFixed(2)+" · L "+modelData.length.toFixed(2)+" mm" }
+                    }
+                }
+                ListView {
+                    clip: true; spacing: 4; model: machineData.tools
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: ListView.view.width; height: 42; radius: 5; color: "#253247"
+                        Label { anchors.fill: parent; anchors.margins: 9; text: "T"+modelData.id+"   "+modelData.name+"   Ø"+modelData.diameter.toFixed(2)+" · L "+modelData.length.toFixed(2)+" mm"+(modelData.pocket>0?" · Cep "+modelData.pocket:"") }
+                    }
+                }
+            }
+            RowLayout { Layout.fillWidth: true; Button { text: "Dati'yi yenile"; onClicked: machineData.refresh() } Button { text: "Klasör seç"; onClicked: machineFolder.open() } }
         }
     }
     Dialog {
@@ -334,9 +385,9 @@ ApplicationWindow {
                     Label { Layout.fillWidth: true; text: motion.liveMode ? "CNI canlı izleme · salt okunur" : root.externalModel ? (root.motionBound ? "Ana makine · X/Y/Z hareket simülasyonu." : "Gerçek Vigor modeli yüklendi; eksen eşlemesi bekleniyor.") : "Sürgüleri hareket ettirin veya otomatik demoyu başlatın."; wrapMode: Text.Wrap; color: motion.liveMode ? "#9ee1b7" : "#aab9ce"; font.pixelSize: 12 }
                     ColumnLayout {
                         Layout.fillWidth: true; spacing: 8; enabled: !motion.programMode && !motion.liveMode; opacity: 1
-                        AxisControl { Layout.fillWidth: true; axisName: "X"; axisIndex: 0; limit: 3660; currentValue: motion.x }
-                        AxisControl { Layout.fillWidth: true; axisName: "Y"; axisIndex: 1; limit: 2100; currentValue: motion.y }
-                        AxisControl { Layout.fillWidth: true; visible: !motion.programMode; axisName: "Z"; axisIndex: 2; limit: 120; currentValue: motion.z }
+                        AxisControl { Layout.fillWidth: true; axisName: "X"; axisIndex: 0; limit: 3660; currentValue: motion.liveMode ? cni.x : motion.x }
+                        AxisControl { Layout.fillWidth: true; axisName: "Y"; axisIndex: 1; limit: 2100; currentValue: motion.liveMode ? cni.y : motion.y }
+                        AxisControl { Layout.fillWidth: true; visible: !motion.programMode; axisName: "Z"; axisIndex: 2; limit: 120; currentValue: motion.liveMode ? cni.z : motion.z }
                     }
                     Rectangle { Layout.fillWidth: true; height: 1; color: "#344154" }
                     RowLayout {
@@ -368,6 +419,7 @@ ApplicationWindow {
                     ActionButton { Layout.fillWidth: true; visible: motion.programMode; text: "PCNI önizlemeyi kapat"; onClicked: {motion.clearPath()} }
                     Item { Layout.fillHeight: true }
                     ActionButton { Layout.fillWidth: true; text: "CNI simülatörüne bağlan"; onClicked: cniDialog.open() }
+                    ActionButton { Layout.fillWidth: true; text: "Makine datası / takımlar"; onClicked: dataDialog.open() }
                     ActionButton { Layout.fillWidth: true; text: "3D model aç…"; onClicked: modelDialog.open() }
                     ActionButton { Layout.fillWidth: true; visible: false; text: "Temsili modele dön"; onClicked: { root.modelUrl=""; motion.reset(); root.homeView() } }
                     Label { Layout.fillWidth: true; visible: !root.externalModel; text: "GLB / glTF / OBJ\nVigor görselleri esas alındı; CAD modeli değildir."; color: "#8695a6"; font.pixelSize: 11; wrapMode: Text.Wrap }

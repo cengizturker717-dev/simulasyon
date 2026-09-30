@@ -50,14 +50,16 @@ public:
     bool programMode() const {return !route.isEmpty();}
     bool cutting() const {return isCutting;}
     bool liveMode() const {return live;}
+    void configureAxisRanges(double xMin,double xMax,double yMin,double yMax,double zMin,double zMax){
+        if(xMax>xMin&&yMax>yMin&&zMax>zMin){minX=xMin;maxX=xMax;minY=yMin;maxY=yMax;minZ=zMin;maxZ=zMax;}
+    }
     Q_INVOKABLE void setLiveAxes(double rawX,double rawY,double rawZ) {
         if(!std::isfinite(rawX)||!std::isfinite(rawY)||!std::isfinite(rawZ))return;
         pause();route.clear();live=true;isCutting=false;
-        // Machine data limits: X -34..5235, Y -240..2310, Z -295..46.
-        // Map full configured strokes into this lightweight model's visual strokes.
-        px=std::clamp((rawX+34.0)/5269.0*3660.0,0.0,3660.0);
-        py=std::clamp((rawY+240.0)/2550.0*2100.0,0.0,2100.0);
-        pz=std::clamp((rawZ+295.0)/341.0*120.0,0.0,120.0);
+        // Map the limits read from Dati/datassi_01_dat.ini into the model strokes.
+        px=std::clamp((rawX-minX)/(maxX-minX)*3660.0,0.0,3660.0);
+        py=std::clamp((rawY-minY)/(maxY-minY)*2100.0,0.0,2100.0);
+        pz=std::clamp((rawZ-minZ)/(maxZ-minZ)*120.0,0.0,120.0);
         emit changed();
     }
     Q_INVOKABLE void endLive() {if(live){live=false;emit changed();}}
@@ -98,4 +100,5 @@ private:
     bool isCutting=false,live=false;
     qsizetype next=1;
     double px=0,py=1050,pz=60,plift=0,rate=1,phase=0;
+    double minX=-34,maxX=5235,minY=-240,maxY=2310,minZ=-295,maxZ=46;
 };

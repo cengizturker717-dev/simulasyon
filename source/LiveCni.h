@@ -18,6 +18,16 @@ class LiveCni : public QObject {
     Q_PROPERTY(double x MEMBER px NOTIFY changed)
     Q_PROPERTY(double y MEMBER py NOTIFY changed)
     Q_PROPERTY(double z MEMBER pz NOTIFY changed)
+    Q_PROPERTY(int center MEMBER centerNumber NOTIFY changed)
+    Q_PROPERTY(int originIndex MEMBER activeOriginIndex NOTIFY changed)
+    Q_PROPERTY(int originNumber READ originNumber NOTIFY changed)
+    Q_PROPERTY(double originX MEMBER ox NOTIFY changed)
+    Q_PROPERTY(double originY MEMBER oy NOTIFY changed)
+    Q_PROPERTY(double originZ MEMBER oz NOTIFY changed)
+    Q_PROPERTY(double workX READ workX NOTIFY changed)
+    Q_PROPERTY(double workY READ workY NOTIFY changed)
+    Q_PROPERTY(double workZ READ workZ NOTIFY changed)
+    Q_PROPERTY(int toolReference MEMBER activeToolReference NOTIFY changed)
 public:
     explicit LiveCni(QObject* parent=nullptr):QObject(parent) {
         watchdog.setInterval(200);
@@ -34,7 +44,11 @@ public:
                 if(!o["x"].isDouble()||!o["y"].isDouble()||!o["z"].isDouble()) {fail("Geçersiz eksen verisi");return;}
                 double x=o["x"].toDouble(),y=o["y"].toDouble(),z=o["z"].toDouble();
                 if(!std::isfinite(x)||!std::isfinite(y)||!std::isfinite(z)){fail("Geçersiz eksen koordinatı");return;}
-                px=x;py=y;pz=z;valid=true;age.restart();message="CNI canlı veri · salt okunur · 3D izleme aktif";emit axes(px,py,pz);emit changed();
+                px=x;py=y;pz=z;
+                centerNumber=o.value("center").toInt(0);activeOriginIndex=o.value("originIndex").toInt(-1);
+                ox=o.value("originX").toDouble();oy=o.value("originY").toDouble();oz=o.value("originZ").toDouble();
+                activeToolReference=o.value("toolReference").toInt(0);
+                valid=true;age.restart();message="CNI canlı veri · salt okunur · 3D izleme aktif";emit axes(px,py,pz);emit changed();
             }
         });
         connect(&process,&QProcess::readyReadStandardError,this,[this]{process.readAllStandardError();});
@@ -43,6 +57,8 @@ public:
     }
     ~LiveCni() {requested=false;process.kill();process.waitForFinished(500);}
     bool active()const{return requested;} bool fresh()const{return valid;} QString status()const{return message;}
+    int originNumber()const{return activeOriginIndex>=0?activeOriginIndex+1:0;}
+    double workX()const{return px-ox;} double workY()const{return py-oy;} double workZ()const{return pz-oz;}
     Q_INVOKABLE void start() {
         if(process.state()!=QProcess::NotRunning)return;
         const QString helper=QCoreApplication::applicationDirPath()+"/CniTelemetry.exe";
@@ -59,6 +75,7 @@ signals:
 private:
     void fail(const QString& reason){requested=false;valid=false;watchdog.stop();process.kill();message=reason;emit disconnected();emit changed();}
     QProcess process;QTimer watchdog;QElapsedTimer age;QByteArray pending;
-    bool requested=false,valid=false;double px=0,py=0,pz=0;
+    bool requested=false,valid=false;double px=0,py=0,pz=0,ox=0,oy=0,oz=0;
+    int centerNumber=0,activeOriginIndex=-1,activeToolReference=0;
     QString message="CNI bağlantısı kapalı";
 };

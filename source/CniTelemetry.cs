@@ -24,7 +24,20 @@ class CniTelemetry {
                         if(shared.ShAxReadParmAss(SharedAx.eIdShaxParmAssR.SHAX_QuotaRealeCartesiana,axis,ref value)!=0)return 6;
                         values[axis]=Number(value);
                     }
-                    Console.WriteLine("{\"x\":"+values[0]+",\"y\":"+values[1]+",\"z\":"+values[2]+"}");
+                    int centerCount=0,originIndex=-1,toolReference=0;
+                    double originX=0,originY=0,originZ=0;
+                    shared.ShAxGetNumCen(out centerCount);
+                    if(centerCount>0) {
+                        shared.ShAxReadParmCen(SharedAx.eIdShaxParmCenI.SHAX_ORIGINI,0,ref originIndex);
+                        shared.ShAxReadParmCen(SharedAx.eIdShaxParmCenR.SHAX_ORX,0,ref originX);
+                        shared.ShAxReadParmCen(SharedAx.eIdShaxParmCenR.SHAX_ORY,0,ref originY);
+                        shared.ShAxReadParmCen(SharedAx.eIdShaxParmCenR.SHAX_ORZ,0,ref originZ);
+                    }
+                    shared.ShAxReadParmAss(SharedAx.eIdShaxParmAssI.SHAX_UtenRifAx,2,ref toolReference);
+                    Console.WriteLine("{\"x\":"+values[0]+",\"y\":"+values[1]+",\"z\":"+values[2]
+                        +",\"center\":0,\"originIndex\":"+originIndex+",\"originX\":"+Number(originX)
+                        +",\"originY\":"+Number(originY)+",\"originZ\":"+Number(originZ)
+                        +",\"toolReference\":"+toolReference+"}");
                     Console.Out.Flush();
                     Thread.Sleep(100);
                 }
