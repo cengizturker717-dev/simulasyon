@@ -4,9 +4,9 @@ import QtQuick3D
 Node {
     id: node
     readonly property bool simplified: true
-    property real axisX: motion.x / 1000
-    property real axisY: (motion.y - 1050) / 1000
-    property real axisZ: (motion.z - 60) / 1000
+    property real axisX: motion.x / 1000 + (motion.programMode ? -0.33508632 : 0)
+    property real axisY: motion.y / 1000 - (motion.programMode ? 0.99354154 : 1.05)
+    property real axisZ: motion.programMode ? 1.0825051 + (motion.cutting ? stock.thickness-stock.depth : stock.thickness+30)/1000 - 1.27960551 : (motion.z - 60) / 1000
 
 
     property real bridgePosition: sim_BRIDGE.x
@@ -7664,7 +7664,7 @@ Node {
         Model {
             id: makine3_par_a_001
             objectName: "makine3-parça.001"
-            position: Qt.vector3d(0.547805, 1.45553, 0.0725629)
+            position: Qt.vector3d(0.547805 + node.axisX, 1.45553, 0.0725629)
             rotation: Qt.quaternion(0.707107, 0, 0, -0.707107)
             scale: Qt.vector3d(0.01, 0.01, 0.0111202)
             source: "meshes/shape_069_mesh.mesh"

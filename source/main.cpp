@@ -13,6 +13,9 @@
 #include <QDir>
 #include <vector>
 #include "Motion.h"
+#include "Pcni.h"
+#include "StockGeometry.h"
+#include "LiveCni.h"
 
 int main(int argc,char **argv) {
     QGuiApplication app(argc,argv);
@@ -21,22 +24,72 @@ int main(int argc,char **argv) {
     QQuickStyle::setStyle("Basic");
     const auto args=app.arguments();
     Motion motion;
+    Pcni pcni;
+    LiveCni cni;
+    QObject::connect(&cni,&LiveCni::axes,&motion,&Motion::setLiveAxes);
+    QObject::connect(&cni,&LiveCni::disconnected,&motion,&Motion::endLive);
+    if(args.contains("--cni-probe")) {
+        cni.start();
+        QTimer::singleShot(4000,&app,[&]{qInfo()<<cni.status()<<cni.property("x")<<cni.property("y")<<cni.property("z");app.exit(cni.fresh()?0:60);});
+        return app.exec();
+    }
+    StockGeometry stock;
+    QObject::connect(&motion,&Motion::swept,&stock,&StockGeometry::cut);
+    QObject::connect(&motion,&Motion::routeReset,&stock,&StockGeometry::reset);
+    if(args.contains("--stock-test")) {
+        stock.configure(100,80,18,8);
+        stock.cut(10,40,90,40,true);if(stock.removed()!=0)return 50;
+        stock.setDepth(6);stock.cut(10,40,90,40,false);
+        if(stock.heightAt(50,40)!=12 || stock.heightAt(50,10)!=18 || stock.removed()<=0)return 51;
+        double volume=stock.removed();stock.cut(10,40,90,40,false);if(stock.removed()!=volume)return 52;
+        stock.setDepth(18);stock.cut(10,40,90,40,false);stock.flush();
+        if(stock.heightAt(50,40)!=0||stock.heightAt(50,10)!=18)return 53;
+        stock.reset();if(stock.removed()!=0||stock.heightAt(50,40)!=18)return 54;
+        stock.configure(2800,2100,18,8);QElapsedTimer t;t.start();
+        stock.cut(0,600,2700,600,false);stock.flush();qInfo()<<"stock update ms"<<t.elapsed();return 0;
+    }
+    const int dataIndex=args.indexOf("--machine-data");
+    if(dataIndex>=0 && dataIndex+1<args.size()) pcni.setRoot(args[dataIndex+1]);
+    if(args.contains("--pcni-test")) {
+        int failed=0,labels=0,points=0;
+        for(const auto& name:pcni.programs()) {
+            bool ok=pcni.load(name);
+            labels+=pcni.property("labels").toList().size(); points+=pcni.property("points").toList().size();
+            if(!ok) {++failed; qWarning()<<name<<pcni.property("status").toString();}
+        }
+        qInfo()<<"programs"<<pcni.programs().size()<<"labels"<<labels<<"points"<<points<<"failed"<<failed;
+        return pcni.programs().isEmpty()||failed?40:0;
+    }
     if(args.contains("--self-test")) {
         motion.setAxis(0,-10); if(motion.x()!=0) return 10;
         motion.setAxis(1,9000); if(motion.y()!=2100) return 11;
         motion.setAxis(2,900); if(motion.z()!=120) return 12;
         motion.setSpeed(99); if(motion.speed()!=3) return 13;
         motion.reset(); if(motion.running() || motion.x()!=0 || motion.y()!=1050) return 14;
+        QVariantList sample{QVariantMap{{"x",100.0},{"y",200.0}},QVariantMap{{"x",102.0},{"y",200.0}}};
+        if(!motion.loadPath(sample) || !motion.programMode() || motion.x()!=100 || motion.y()!=200) return 16;
+        if(motion.loadPath({QVariantMap{{"x",-1},{"y",0}},sample.last()})) return 17;
+        motion.clearPath(); if(motion.programMode()) return 18;
         motion.play();
         QTimer::singleShot(250,&app,[&] {
             bool ok=motion.running() && motion.x()>0 && motion.x()<=3660;
             motion.pause();
-            app.exit(ok && !motion.running()?0:15);
+            if(!ok || motion.running()) {app.exit(15);return;}
+            motion.loadPath({QVariantMap{{"x",100.0},{"y",200.0}},QVariantMap{{"x",102.0},{"y",200.0}}});
+            motion.play();
+            QTimer::singleShot(250,&app,[&]{
+                bool ended=!motion.running() && motion.x()==102 && motion.y()==200 && motion.z()==60;
+                motion.reset();
+                app.exit(ended && motion.x()==100 && motion.programMode()?0:19);
+            });
         });
         return app.exec();
     }
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("motion",&motion);
+    engine.rootContext()->setContextProperty("pcni",&pcni);
+    engine.rootContext()->setContextProperty("cni",&cni);
+    engine.rootContext()->setContextProperty("stock",&stock);
     QUrl startupModel;
     const int modelIndex=args.indexOf("--model");
     if(modelIndex>=0 && modelIndex+1<args.size()) {
@@ -52,6 +105,17 @@ int main(int argc,char **argv) {
         return 2;
     }
     auto window=qobject_cast<QQuickWindow*>(engine.rootObjects().first());
+    const int pcniIndex=args.indexOf("--pcni");
+    if(pcniIndex>=0 && pcniIndex+1<args.size()) {
+        pcni.load(args[pcniIndex+1]);
+        if(args.contains("--material")) {
+            if(pcni.property("ready").toBool()) {
+                motion.loadPath(pcni.property("points").toList());
+                stock.configure(pcni.property("width").toDouble(),pcni.property("height").toDouble(),pcni.property("thickness").toDouble(),pcni.property("toolDiameter").toDouble());
+                QTimer::singleShot(1000,&app,[&]{QMetaObject::invokeMethod(window,"homeView");if(args.contains("--demo"))motion.play();});
+            }
+        } else QTimer::singleShot(1000,&app,[&]{QMetaObject::invokeMethod(window,"showPcni");});
+    }
     int frames=0;
     QObject::connect(window,&QQuickWindow::frameSwapped,&app,[&]{++frames;});
     QElapsedTimer fpsClock; fpsClock.start();
@@ -89,11 +153,11 @@ int main(int argc,char **argv) {
                 QCoreApplication::sendEvent(window,&event);
             }
             const auto z=camera->property("z").toDouble();
-            cameraTestOk &= z>=5999 && z<=35001 && camera->property("clipNear").toDouble()==20 && camera->property("clipFar").toDouble()==60000;
+            cameraTestOk &= z>=1199 && z<=10001 && camera->property("clipNear").toDouble()==20 && camera->property("clipFar").toDouble()==60000;
             if(step==40 || step==100 || step==150 || step==170) {
                 cameraTestOk &= window->grabWindow().save(directory+QString("/zoom-%1.png").arg(step));
-                if(step==40) cameraTestOk &= std::abs(z-35000)<1;
-                if(step==100) cameraTestOk &= std::abs(z-6000)<1;
+                if(step==40) cameraTestOk &= std::abs(z-10000)<1;
+                if(step==100) cameraTestOk &= std::abs(z-1200)<1;
                 if(step==150) QMetaObject::invokeMethod(window,"homeView");
             }
             if(step==170) {
@@ -161,17 +225,33 @@ int main(int argc,char **argv) {
         });
     }
     if(args.contains("--demo")) motion.play();
+    if(args.contains("--cni-live")) cni.start();
+    if(args.contains("--inspection")) QTimer::singleShot(12000,&app,[&]{QMetaObject::invokeMethod(window,"inspectionView");});
     const int captureIndex=args.indexOf("--capture");
     if(captureIndex>=0 && captureIndex+1<args.size()) {
         if(!args.contains("--model")) motion.play();
         QTimer::singleShot(18000,&app,[&]{
             const auto image=window->grabWindow();
             bool ok=!image.isNull() && image.save(args[captureIndex+1]);
+            if(args.contains("--material") && motion.programMode()) {
+                const double tipX=window->property("testBridge").toDouble()+0.02517972;
+                const double tipY=window->property("testZ").toDouble()+0.57505423;
+                const double tipZ=window->property("testSpindle").toDouble()-0.21110186;
+                const double desiredY=1.0825051+(motion.cutting()?stock.thickness()-stock.depth():stock.thickness()+30)/1000;
+                const bool aligned=std::abs(tipX-(-0.3099066+motion.x()/1000))<0.0001
+                    && std::abs(tipZ-(-1.2046434+motion.y()/1000))<0.0001 && std::abs(tipY-desiredY)<0.0001;
+                qInfo()<<"stock/tool alignment"<<aligned<<"removed cm3"<<stock.removed();
+                ok &= aligned;
+            }
             QFile report(args[captureIndex+1]+".txt");
             if(report.open(QIODevice::WriteOnly)) {
                 QTextStream out(&report);
                 out << "fps=" << window->property("measuredFps").toDouble()
                     << "\nx=" << motion.x() << "\ny=" << motion.y() << "\nz=" << motion.z()
+                    << "\nliveMode=" << motion.liveMode() << "\ncniFresh=" << cni.fresh()
+                    << "\ncniRawX=" << cni.property("x").toDouble()
+                    << "\ncniRawY=" << cni.property("y").toDouble()
+                    << "\ncniRawZ=" << cni.property("z").toDouble()
                     << "\nmodelState=" << window->property("modelState").toString()
                     << "\ncapture=" << ok << "\n";
             }

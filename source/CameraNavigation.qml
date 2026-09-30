@@ -5,9 +5,9 @@ Item {
     id: navigation
     required property Node origin
     required property PerspectiveCamera camera
-    property real minimumDistance: 6000
-    property real maximumDistance: 35000
-    property real targetDistance: 12500
+    property real minimumDistance: 1200
+    property real maximumDistance: 10000
+    property real targetDistance: 6000
     property real animatedDistance: targetDistance
     property bool smoothing: true
     function setDistance(distance) {
