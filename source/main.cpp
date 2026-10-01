@@ -72,8 +72,8 @@ int main(int argc,char **argv) {
         return pcni.programs().isEmpty()||failed?40:0;
     }
     if(args.contains("--self-test")) {
-        motion.configureAxisRanges(-34,5235,0,-240,2310,100,-295,46,-270);
-        motion.setLiveAxes(0,100,-270);
+        motion.configureAxisRanges(-34,5235,0,-240,2310,0,-295,46,-280);
+        motion.setLiveAxes(0,0,-280);
         if(motion.x()!=0 || motion.y()!=1050 || motion.z()!=60 || !motion.liveMode()) return 9;
         motion.endLive();
         motion.setAxis(0,-10); if(motion.x()!=0) return 10;

@@ -44,7 +44,7 @@ public:
         for(const QString& g:ax.childGroups()) if(g.startsWith("AX_")){
             ax.beginGroup(g);int index=g.mid(3).toInt();double origin=ax.value("ORIG").toDouble();
             double lo=ax.value("FINDW").toDouble(),hi=ax.value("FINUP").toDouble(),recovery=ax.value("QRIP").toDouble();ax.endGroup();
-            while(mins.size()<=index){mins.append(0);maxs.append(1);references.append(0);}mins[index]=lo;maxs[index]=hi;references[index]=recovery;
+            while(mins.size()<=index){mins.append(0);maxs.append(1);references.append(0);}mins[index]=lo;maxs[index]=hi;references[index]=origin;
             axisRows.append(QVariantMap{{"index",index},{"name",index==0?"X":index==1?"Y":index==2?"Z":QString("A%1").arg(index)},
                 {"machineZero",origin},{"min",lo},{"max",hi},{"recovery",recovery}});
         }

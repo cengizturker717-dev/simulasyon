@@ -1872,6 +1872,9 @@ Node {
         Node {
             id: supurmebosaltma_001
             objectName: "SUPURMEBOSALTMA.001"
+            // The conveyor/lift was removed from the lightweight HMI model.
+            // Its detached drive and cable carrier must not remain visible.
+            visible: false
             position: Qt.vector3d(0, 0.704551, 0)
             x: node.axisX
             Node {
@@ -7666,6 +7669,8 @@ Node {
         Model {
             id: makine3_par_a_001
             objectName: "makine3-parça.001"
+            // Orphaned auxiliary rod from the removed peripheral assembly.
+            visible: false
             position: Qt.vector3d(0.547805 + node.axisX, 1.45553, 0.0725629)
             rotation: Qt.quaternion(0.707107, 0, 0, -0.707107)
             scale: Qt.vector3d(0.01, 0.01, 0.0111202)
