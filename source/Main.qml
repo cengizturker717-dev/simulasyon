@@ -294,7 +294,9 @@ ApplicationWindow {
                         clearColor: "#202833"
                         backgroundMode: SceneEnvironment.Color
                         antialiasingMode: SceneEnvironment.MSAA
-                        antialiasingQuality: SceneEnvironment.Medium
+                        // Controller profile: VirtualBox WDDM, 0 MB dedicated
+                        // VRAM and 4 GB system RAM. Keep 2x MSAA only.
+                        antialiasingQuality: SceneEnvironment.Low
                     }
                     DirectionalLight { eulerRotation: Qt.vector3d(-45,-35,0); brightness: 1.0; ambientColor: "#777777" }
                     DirectionalLight { eulerRotation: Qt.vector3d(-30,140,0); brightness: 0.5; ambientColor: "#202020" }
