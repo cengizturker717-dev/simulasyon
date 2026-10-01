@@ -3,9 +3,9 @@ import QtQuick3D
 
 Node {
     id: node
-    property real axisX: motion.x / 1000
-    property real axisY: (motion.y - 1050) / 1000
-    property real axisZ: (motion.z - 60) / 1000
+    property real axisX: motion.x / 1000 + (motion.programMode ? -0.33508632 : -0.64955)
+    property real axisY: motion.y / 1000 - (motion.programMode ? 0.99354154 : 1.05)
+    property real axisZ: motion.programMode ? 1.0825051 + (motion.cutting ? stock.thickness-stock.depth : stock.thickness+30)/1000 - 1.27960551 : (motion.z - 60) / 1000
     property real liftHeight: motion.lift / 1000
 
 
@@ -31918,6 +31918,7 @@ Node {
                 paint__234__232__240__255__material,
                 paint__0__0__0__255__material,
                 paint__185__188__191__255__material,
+                paint__55__55__55__255__material,
                 paint__231__88__7__255__material,
                 paint__231__231__231__95__material,
                 paint__0__0__0__255__material,

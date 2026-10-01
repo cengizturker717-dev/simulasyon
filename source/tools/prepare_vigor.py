@@ -37,7 +37,13 @@ for mesh_id,node_id,kind in [(3,13,'bridge'),(4,19,'lift')]:
   for k in np.unique(facegroups):
    selected=facegroups==k;xyz=pos[idx[selected].ravel()];lo=xyz.min(0);hi=xyz.max(0)
    if kind=='bridge':
-    moving=lo[0]>-.8 and hi[0]<.8 and hi[1]>.30 and not (hi[1]<.45 and hi[1]-lo[1]<.08)
+    # The front cable carrier and its drive sit below the main bridge body.
+    # Treat that connected low assembly as part of the bridge as well; leaving
+    # it in the static mesh makes the drive visibly detach during X travel.
+    low_bridge_accessory=(lo[0]>-.65 and hi[0]<.65 and lo[1]>-.15 and
+                          hi[1]<.45 and lo[2]>-1.50 and hi[2]<-1.15)
+    moving=(lo[0]>-.8 and hi[0]<.8 and hi[1]>.30 and
+            not (hi[1]<.45 and hi[1]-lo[1]<.08)) or low_bridge_accessory
     carriage=moving and lo[1]>.55 and lo[2]>-.75 and hi[2]<.85
     assign[selected]=2 if carriage else 1 if moving else 0
    else:

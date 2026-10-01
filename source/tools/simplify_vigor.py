@@ -12,6 +12,9 @@ s=re.sub(r'^        (?:Node|Model) \{\n.*?^        \}',filterblock,s,flags=re.M|
 s=re.sub(r'^    property real (?:liftHeight|liftPosition):.*\n','',s,flags=re.M)
 s=s.replace('    id: node','    id: node\n    readonly property bool simplified: true',1)
 s=s.replace('source: "meshes/l_o_altma1_009_mesh.mesh"', 'source: "cleanedstatic/meshes/l_o_altma1_009_mesh.mesh"')
+# Removed peripherals must not leave detached drive/rod geometry in the HMI.
+s=s.replace('objectName: "SUPURMEBOSALTMA.001"', 'objectName: "SUPURMEBOSALTMA.001"\n            visible: false', 1)
+s=s.replace('objectName: "makine3-parça.001"', 'objectName: "makine3-parça.001"\n            visible: false', 1)
 src.with_name('VigorLite.qml').write_text(s,encoding='utf8')
 report={'removed':removed,'full_models':src.read_text(encoding='utf8').count('Model {'),'lite_models':s.count('Model {')}
 Path('work/lite-report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')

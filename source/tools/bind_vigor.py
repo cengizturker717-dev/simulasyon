@@ -2,9 +2,9 @@ from pathlib import Path
 import re
 p=Path('outputs/SolidSimNative/assets/catalog/VigorCatalog.qml');s=p.read_text(encoding='utf8')
 s=s.replace('    id: node','''    id: node
-    property real axisX: motion.x / 1000
-    property real axisY: (motion.y - 1050) / 1000
-    property real axisZ: (motion.z - 60) / 1000
+    property real axisX: motion.x / 1000 + (motion.programMode ? -0.33508632 : -0.64955)
+    property real axisY: motion.y / 1000 - (motion.programMode ? 0.99354154 : 1.05)
+    property real axisZ: motion.programMode ? 1.0825051 + (motion.cutting ? stock.thickness-stock.depth : stock.thickness+30)/1000 - 1.27960551 : (motion.z - 60) / 1000
     property real liftHeight: motion.lift / 1000
 ''',1)
 props={'SIM_BRIDGE':'x: node.axisX','SIM_CARRIAGE':'x: node.axisX; z: node.axisY; y: 0.704551 + node.axisZ','9KW.001':'x: node.axisX; z: node.axisY; y: 0.704551 + node.axisZ','SIM_LIFT':'y: 0.704551 + node.liftHeight','SUPURMEBOSALTMA.001':'x: node.axisX','CLAMPONU':'x: node.axisX','CLAMP':'x: node.axisX','BASKIRULOSU':'x: node.axisX','ROTARYMAG':'x: node.axisX','VİGOR FT_2136.001':'x: -0.64955 + node.axisX'}

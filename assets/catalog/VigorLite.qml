@@ -4,8 +4,6 @@ import QtQuick3D
 Node {
     id: node
     readonly property bool simplified: true
-    // The imported CAD snapshot is 649.55 mm to the right of the mechanical
-    // X home. Keep the existing PCNI/material calibration for program mode.
     property real axisX: motion.x / 1000 + (motion.programMode ? -0.33508632 : -0.64955)
     property real axisY: motion.y / 1000 - (motion.programMode ? 0.99354154 : 1.05)
     property real axisZ: motion.programMode ? 1.0825051 + (motion.cutting ? stock.thickness-stock.depth : stock.thickness+30)/1000 - 1.27960551 : (motion.z - 60) / 1000
@@ -1872,8 +1870,6 @@ Node {
         Node {
             id: supurmebosaltma_001
             objectName: "SUPURMEBOSALTMA.001"
-            // The conveyor/lift was removed from the lightweight HMI model.
-            // Its detached drive and cable carrier must not remain visible.
             visible: false
             position: Qt.vector3d(0, 0.704551, 0)
             x: node.axisX
@@ -7669,9 +7665,8 @@ Node {
         Model {
             id: makine3_par_a_001
             objectName: "makine3-parça.001"
-            // Orphaned auxiliary rod from the removed peripheral assembly.
             visible: false
-            position: Qt.vector3d(0.547805 + node.axisX, 1.45553, 0.0725629)
+            position: Qt.vector3d(0.547805, 1.45553, 0.0725629)
             rotation: Qt.quaternion(0.707107, 0, 0, -0.707107)
             scale: Qt.vector3d(0.01, 0.01, 0.0111202)
             source: "meshes/shape_069_mesh.mesh"
@@ -7712,6 +7707,7 @@ Node {
                 paint__234__232__240__255__material,
                 paint__0__0__0__255__material,
                 paint__185__188__191__255__material,
+                paint__55__55__55__255__material,
                 paint__231__88__7__255__material,
                 paint__231__231__231__95__material,
                 paint__0__0__0__255__material,
