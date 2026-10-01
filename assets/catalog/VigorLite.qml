@@ -4,7 +4,9 @@ import QtQuick3D
 Node {
     id: node
     readonly property bool simplified: true
-    property real axisX: motion.x / 1000 + (motion.programMode ? -0.33508632 : 0)
+    // The imported CAD snapshot is 649.55 mm to the right of the mechanical
+    // X home. Keep the existing PCNI/material calibration for program mode.
+    property real axisX: motion.x / 1000 + (motion.programMode ? -0.33508632 : -0.64955)
     property real axisY: motion.y / 1000 - (motion.programMode ? 0.99354154 : 1.05)
     property real axisZ: motion.programMode ? 1.0825051 + (motion.cutting ? stock.thickness-stock.depth : stock.thickness+30)/1000 - 1.27960551 : (motion.z - 60) / 1000
 

@@ -205,7 +205,7 @@ int main(int argc,char **argv) {
                 const double spindle=window->property("testSpindle").toDouble();
                 const double lift=window->property("testLift").toDouble();
                 const double vertical=window->property("testZ").toDouble();
-                const bool ok=window->property("motionBound").toBool() && std::abs(bridge-3.0)<.001 && std::abs(spindle-.65)<.001 && std::abs(vertical-.754551)<.001;
+                const bool ok=window->property("motionBound").toBool() && std::abs(bridge-2.35045)<.001 && std::abs(spindle-.65)<.001 && std::abs(vertical-.754551)<.001;
                 window->grabWindow().save(directory+"/moved.png");
                 QFile f(directory+"/motion-test.txt"); if(f.open(QIODevice::WriteOnly)) { QTextStream o(&f); o<<"passed="<<ok<<"\nbridge_m="<<bridge<<"\nspindle_m="<<spindle<<"\nspindle_height_m="<<vertical<<"\nlift_delta_m="<<lift-initialLift<<"\n"; }
                 motion.reset(); app.exit(ok?0:30);
