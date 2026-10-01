@@ -40,8 +40,10 @@ for mesh_id,node_id,kind in [(3,13,'bridge'),(4,19,'lift')]:
     # The front cable carrier and its drive sit below the main bridge body.
     # Treat that connected low assembly as part of the bridge as well; leaving
     # it in the static mesh makes the drive visibly detach during X travel.
-    low_bridge_accessory=(lo[0]>-.65 and hi[0]<.65 and lo[1]>-.15 and
-                          hi[1]<.45 and lo[2]>-1.50 and hi[2]<-1.15)
+    # Include the complete U-shaped carrier, motor and lower brackets. Some
+    # links extend behind/below the bridge, outside the first narrow bounds.
+    low_bridge_accessory=(lo[0]>-1.10 and hi[0]<.65 and lo[1]>-.55 and
+                          hi[1]<.45 and lo[2]>-1.50 and hi[2]<-.95)
     moving=(lo[0]>-.8 and hi[0]<.8 and hi[1]>.30 and
             not (hi[1]<.45 and hi[1]-lo[1]<.08)) or low_bridge_accessory
     carriage=moving and lo[1]>.55 and lo[2]>-.75 and hi[2]<.85
