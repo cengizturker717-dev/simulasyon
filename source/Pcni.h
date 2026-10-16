@@ -9,6 +9,7 @@
 #include <QVariantList>
 #include <cmath>
 #include <functional>
+#include "ToolAngles.h"
 
 // Read-only interpreter of the installed vertical PON/PUP and G99 cycles.
 // Depth is positive downwards from the panel top; CNI Z is LZ+Z.
@@ -106,10 +107,12 @@ public:
         };
         double x=0,y=0,depth=-20,diam=0,feed=100,ox=0,oy=0;
         QString toolName,kind="router";QVariantList drills;
-        bool active=false,modalRapid=false;int expected=-1,lineNumber=0;QString problem;
+        bool active=false,modalRapid=false;int expected=-1,lineNumber=0;QString problem;QStringList notes;
+        QHash<QString,double> angles;   // simulator-side V tip angles (ToolAngles.h)
+        auto angleOf=[&](const QString& name){auto it=angles.find(name);if(it==angles.end())it=angles.insert(name,toolAngle(name));return it.value();};
         auto append=[&](double nx,double ny,double nd,bool travel,double velocity) {
             if(!std::isfinite(nx)||!std::isfinite(ny)||!std::isfinite(nd)||!std::isfinite(velocity)||velocity<=0||nd<-500||nd>500||nx<0||nx>panelLimit||ny<0||ny>2100){problem="Geçersiz koordinat, derinlik veya ilerleme · seçili makine sınırı";return;}
-            path.append(QVariantMap{{"x",nx},{"y",ny},{"depth",nd},{"travel",travel},{"diameter",diam},{"feed",velocity},{"kind",kind},{"tool",toolName},{"line",lineNumber},{"holes",drills}});
+            path.append(QVariantMap{{"x",nx},{"y",ny},{"depth",nd},{"travel",travel},{"diameter",diam},{"angle",kind=="router"?angleOf(toolName):0.0},{"feed",velocity},{"kind",kind},{"tool",toolName},{"line",lineNumber},{"holes",drills}});
             x=nx;y=ny;depth=nd;
         };
         const QString content=QString::fromUtf8(input.readAll());
@@ -118,7 +121,9 @@ public:
             // A program comment does not register a tool in the CNI library.
             // Tool diameter always comes from datpunt_dat.ini.
             if(td.hasMatch()&&diameters.contains(td.captured(1))&&std::abs(diameters.value(td.captured(1))-td.captured(2).toDouble())>.01)
-                return reject(td.captured(1)+" takım çapı programla takım kütüphanesinde farklı");
+                // The controller cuts with the library tool; a differing CAM comment
+                // (common for V cutters) is reported, not a reason to refuse.
+                notes.append(td.captured(1)+" CAM Ø"+td.captured(2)+" / kütüphane Ø"+QString::number(diameters.value(td.captured(1)))+" (kütüphane kullanıldı)");
             QString line=raw.section(';',0,0).trimmed();if(line.isEmpty()||line.startsWith('[')||line=="%")continue;
             lineNumber=int(number(line,"N",lineNumber));
             if(line.contains(cachedRegex("\\bLX=?"))) {sx=number(line,"LX",0);sy=number(line,"LY",0);sz=number(line,"LZ",0);}
@@ -185,7 +190,7 @@ public:
         if(sx<=0||sy<=0||sx>panelLimit||sy>2100||sz<=0||sz>120)return reject("LX / LY / LZ plaka ölçüleri eksik veya seçili makine sınırı dışında");
         if(expected>=0&&expected!=tags.size())return reject("Etiket sayısı program başlığıyla uyuşmuyor");
         if(path.size()<2)return reject("İşlenecek yol bulunamadı");
-        valid=true;message=QString("%1 × %2 × %3 mm · %4 yol adımı · %5 matkap deliği\nPRF / Z / ZI derinliği ve takım çapıyla malzeme işleme").arg(sx).arg(sy).arg(sz).arg(path.size()).arg(holesCount);emit changed();return true;
+        valid=true;message=QString("%1 × %2 × %3 mm · %4 yol adımı · %5 matkap deliği\nPRF / Z / ZI derinliği ve takım çapıyla malzeme işleme").arg(sx).arg(sy).arg(sz).arg(path.size()).arg(holesCount);if(!notes.isEmpty())message+="\n"+notes.join(" · ");emit changed();return true;
     }
 signals: void changed();
 private:

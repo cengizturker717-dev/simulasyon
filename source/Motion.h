@@ -46,7 +46,7 @@ public:
                     double distance=std::hypot(std::hypot(tx-px,ty-py),targetDepth-pdepth);
                     const double fraction=distance>0?std::min(1.0,remaining*velocity/distance):1.0;
                     px+=(tx-px)*fraction;py+=(ty-py)*fraction;pdepth+=(targetDepth-pdepth)*fraction;
-                    pdiam=p.value("diameter",8).toDouble();pkind=p.value("kind","router").toString();pname=p.value("tool").toString();pline=p.value("line").toInt();
+                    pdiam=p.value("diameter",8).toDouble();pangle=p.value("angle",0).toDouble();pkind=p.value("kind","router").toString();pname=p.value("tool").toString();pline=p.value("line").toInt();
                     pdrills=p.value("holes").toList();
                     isCutting=!travel&&std::max(oldDepth,pdepth)>0;
                     if(detailed)emit machined(oldX,oldY,oldDepth,px,py,pdepth,pdiam,travel,p.value("holes").toList());
@@ -77,7 +77,7 @@ public:
     double machineXLimit() const {return std::max(0.0,maxX-refX);}
     double workLength()const{return panelLimit;}
     void setWorkLength(double length){if(length>=2800&&length<=4200){workspaceConfigured=true;if(length!=panelLimit){pause();panelLimit=length;emit workspaceChanged();}}}
-    double toolDepth() const{return pdepth;}double toolDiameter() const{return pdiam;}
+    double toolDepth() const{return pdepth;}double toolDiameter() const{return pdiam;}double toolAngle() const{return pangle;}
     QString toolKind() const{return pkind;}QString toolName() const{return pname;}int programLine() const{return pline;}
     QVariantList activeDrills() const{return pdrills;}
     void configureAxisRanges(double xMin,double xMax,double xReference,double yMin,double yMax,double yReference,double zMin,double zMax,double zReference){
@@ -171,7 +171,7 @@ private:
     bool isCutting=false,live=false;
     qsizetype next=1;
     double px=0,py=0,pz=60,plift=0,rate=1,phase=0;
-    double pdepth=0,pdiam=8;QString pkind="router",pname;int pline=0;QVariantList pdrills;
+    double pdepth=0,pdiam=8,pangle=0;QString pkind="router",pname;int pline=0;QVariantList pdrills;
     double minX=-34,maxX=5235,refX=0,minY=-240,maxY=2310,refY=0,minZ=-295,maxZ=46,refZ=-280;
     double rawX=0,rawY=0,rawZ=-280;
     bool machinePosition=false;

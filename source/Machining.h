@@ -23,7 +23,7 @@ class Machining : public QObject {
     Q_PROPERTY(QVariantList activeDrills READ activeDrills NOTIFY activeDrillsChanged)
 public:
     Machining(Motion& m,Pcni& p,StockGeometry& s):motion(m),pcni(p),stock(s) {
-        connect(&motion,&Motion::machined,this,[this](double ax,double ay,double ad,double bx,double by,double bd,double diameter,bool travel,const QVariantList& holes){remove(ax,ay,ad,bx,by,bd,diameter,travel,holes);});
+        connect(&motion,&Motion::machined,this,[this](double ax,double ay,double ad,double bx,double by,double bd,double diameter,bool travel,const QVariantList& holes){remove(ax,ay,ad,bx,by,bd,diameter,travel,holes,this->motion.toolAngle());});
         connect(&motion,&Motion::operationChanged,this,&Machining::publishChanges);
         connect(&motion,&Motion::programModeChanged,this,&Machining::publishChanges);
         connect(&motion,&Motion::runningChanged,this,[this]{if(!job&&motion.programMode()){message=motion.running()?"İşleme sürüyor":motion.completed()?"İşleme önizlemesi tamamlandı":"İşleme duraklatıldı";publishChanges();}});
@@ -136,11 +136,11 @@ public:
             auto corner=livePath[lastCursor].toMap();
             if(!corner["travel"].toBool()&&corner["tool"]==operation["tool"]&&corner["kind"]==operation["kind"]){
                 const double cx=corner["x"].toDouble(),cy=corner["y"].toDouble(),cd=corner["depth"].toDouble();
-                remove(lastX,lastY,lastDepth,cx,cy,cd,corner["diameter"].toDouble(),false,corner["holes"].toList());
+                remove(lastX,lastY,lastDepth,cx,cy,cd,corner["diameter"].toDouble(),false,corner["holes"].toList(),corner["angle"].toDouble());
                 lastX=cx;lastY=cy;lastDepth=cd;continuous=true;
             }
         }
-        remove(continuous?lastX:x,continuous?lastY:y,continuous?lastDepth:d,x,y,d,operation["diameter"].toDouble(),false,operation["holes"].toList());
+        remove(continuous?lastX:x,continuous?lastY:y,continuous?lastDepth:d,x,y,d,operation["diameter"].toDouble(),false,operation["holes"].toList(),operation["angle"].toDouble());
         cursor=match;lastCursor=match;lastX=x;lastY=y;lastDepth=d;previous=true;
         message=QString("Canlı işleme · N%1 · %2").arg(operation["line"].toInt()).arg(liveTool);publishChanges();
     }
@@ -184,8 +184,8 @@ private:
     void setLiveDrills(const QVariantList& value){if(liveDrills!=value){liveDrills=value;emit activeDrillsChanged();}}
     bool validPanel()const{double w=pcni.property("width").toDouble(),h=pcni.property("height").toDouble(),t=pcni.property("thickness").toDouble();return std::isfinite(w)&&std::isfinite(h)&&std::isfinite(t)&&w>0&&w<=pcni.workLength()&&h>0&&h<=2100&&t>0&&t<=120;}
     void configure(){stock.configure(pcni.property("width").toDouble(),pcni.property("height").toDouble(),pcni.property("thickness").toDouble(),pcni.property("toolDiameter").toDouble());}
-    void remove(double ax,double ay,double ad,double bx,double by,double bd,double diameter,bool travel,const QVariantList& holes){
-        if(holes.isEmpty())stock.cutProfile(ax,ay,ad,bx,by,bd,diameter,travel);
+    void remove(double ax,double ay,double ad,double bx,double by,double bd,double diameter,bool travel,const QVariantList& holes,double angle=0){
+        if(holes.isEmpty())stock.cutProfile(ax,ay,ad,bx,by,bd,diameter,travel,angle);
         else for(const auto& value:holes){auto h=value.toMap();double dx=h["dx"].toDouble(),dy=h["dy"].toDouble();stock.cutProfile(ax+dx,ay+dy,ad,bx+dx,by+dy,bd,h["diameter"].toDouble(),travel);}
     }
     Motion& motion;Pcni& pcni;StockGeometry& stock;

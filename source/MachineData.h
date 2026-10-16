@@ -7,6 +7,7 @@
 #include <QTimer>
 #include <algorithm>
 #include <cmath>
+#include "ToolAngles.h"
 
 // Read-only view of NcOne Dati files. It never changes machine data.
 class MachineData : public QObject {
@@ -44,6 +45,8 @@ public:
     double axisMax(int i)const{return i>=0&&i<maxs.size()?maxs[i]:1;}
     double axisReference(int i)const{return i>=0&&i<references.size()?references[i]:0;}
     void setRoot(const QString& value){base=QDir::cleanPath(value);refresh();}
+    // Simulator-side V tip angle (degrees, 0 = flat); stored outside Dati.
+    Q_INVOKABLE void setToolAngle(const QString& name,double angle){::setToolAngle(name,angle);refresh();}
     Q_INVOKABLE void refresh(){
         axisRows.clear();originRows.clear();toolRows.clear();magazineRows.clear();drillRows.clear();mins.clear();maxs.clear();references.clear();activeMagazineType=0;
         const QString data=base+"/Dati/";
@@ -97,7 +100,7 @@ public:
             tl.beginGroup(g);int pocket=tl.value("PMAG").toInt();QVariantMap row{{"id",g.mid(5).toInt()},
                 {"name",tl.value("NOME").toString()},{"diameter",tl.value("DIAM").toDouble()},
                 {"length",tl.value("LUNG").toDouble()},{"pocket",pocket},{"magazine",0},
-                {"maxRpm",tl.value("VMAX").toDouble()},{"workRpm",tl.value("VROT").toDouble()}};
+                {"maxRpm",tl.value("VMAX").toDouble()},{"workRpm",tl.value("VROT").toDouble()},{"angle",toolAngle(tl.value("NOME").toString())}};
             toolRows.append(row);tl.endGroup();
         }
         // Live pocket contents: datcmbu ATR_n belongs to datmag CMB_n. UTE names the
@@ -109,7 +112,7 @@ public:
             for(const auto& toolValue:toolRows) {
                 const auto tool=toolValue.toMap();
                 if(tool.value("name").toString()!=name)continue;
-                pocket["toolId"]=tool.value("id");pocket["diameter"]=tool.value("diameter");pocket["length"]=tool.value("length");
+                pocket["toolId"]=tool.value("id");pocket["diameter"]=tool.value("diameter");pocket["length"]=tool.value("length");pocket["tipAngle"]=tool.value("angle");   // "angle" is the pocket's CrtMAG
                 return true;
             }
             return false;

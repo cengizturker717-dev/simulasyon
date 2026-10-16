@@ -110,3 +110,11 @@ save('rotarymag_body', [(dn, dark[~np.isin(lab, fork_ids)]), (gn, grey)])
 save('rotarymag_fork', [(dn, fork)])
 print('rotary: centre local x=%.5f y=%.5f z=%.5f, template angle=%.2f, fork radial %.4f..%.4f, fork top y=%.4f, forks found %d'
       % (centre[0], centre[1], centre[2], phi0, radial.min(), radial.max(), fork[:, :, 1].max(), len(fork_ids)))
+
+# ---- holder: drop the CAD's dummy 4 mm pin under the nose; the real tool is
+# drawn per pocket from datpunt DIAM/LUNG (MagazineInstances part 1/2).
+(hn, holder), = dump('magazine_holder')
+r = np.hypot(holder[:, :, 0], holder[:, :, 2])
+pin = (r.max(1) <= 0.0021) & (holder[:, :, 1].max(1) < 0.1005)
+save('magazine_holder', [(hn, holder[~pin])])
+print('holder pin triangles removed:', int(pin.sum()))

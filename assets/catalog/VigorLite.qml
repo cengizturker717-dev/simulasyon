@@ -176,6 +176,14 @@ Node {
         alphaMode: PrincipledMaterial.Blend
     }
     PrincipledMaterial {
+        id: magazineToolMaterial
+        objectName: "Magazine tool steel"
+        baseColor: "#ffc9d0d6"
+        metalness: 0.15
+        roughness: 0.35
+        cullMode: PrincipledMaterial.NoCulling
+    }
+    PrincipledMaterial {
         id: hsdAluminumMaterial
         objectName: "HSD ES929-A aluminum"
         baseColor: "#ffc5c9cc"
@@ -317,6 +325,20 @@ Node {
             materials: [paint__0__0__0__255__material]
         }
         Model {
+            objectName: "FIXEDMAG_TOOL_BODY"
+            visible: node.magazineKnown && !node.rotaryMagazine
+            source: "#Cylinder"
+            instancing: MagazineInstances { pockets: node.magazinePockets; occupiedOnly: true; part: 1; origin: Qt.vector3d(-1.48069, .957855, -.9809) }
+            materials: [magazineToolMaterial]
+        }
+        Model {
+            objectName: "FIXEDMAG_TOOL_TIP"
+            visible: node.magazineKnown && !node.rotaryMagazine
+            source: "#Cone"
+            instancing: MagazineInstances { pockets: node.magazinePockets; occupiedOnly: true; part: 2; origin: Qt.vector3d(-1.48069, .957855, -.9809) }
+            materials: [magazineToolMaterial]
+        }
+        Model {
             objectName: "ROTARYMAG_BODY"
             visible: node.magazineKnown && node.rotaryMagazine
             position: Qt.vector3d(node.axisX, .704551, 0)
@@ -340,6 +362,22 @@ Node {
             source: "meshes/magazine_holder.mesh"
             instancing: MagazineInstances { objectName: "rotaryHolderInstances"; pockets: node.magazinePockets; radial: true; direction: -1; occupiedOnly: true; radius: .232 }
             materials: [paint__0__0__0__255__material]
+        }
+        Model {
+            objectName: "ROTARYMAG_TOOL_BODY"
+            visible: node.magazineKnown && node.rotaryMagazine
+            position: Qt.vector3d(node.axisX + .08666, .704551 + .3569, -1.76251)
+            source: "#Cylinder"
+            instancing: MagazineInstances { pockets: node.magazinePockets; occupiedOnly: true; part: 1; radial: true; direction: -1; radius: .232 }
+            materials: [magazineToolMaterial]
+        }
+        Model {
+            objectName: "ROTARYMAG_TOOL_TIP"
+            visible: node.magazineKnown && node.rotaryMagazine
+            position: Qt.vector3d(node.axisX + .08666, .704551 + .3569, -1.76251)
+            source: "#Cone"
+            instancing: MagazineInstances { pockets: node.magazinePockets; occupiedOnly: true; part: 2; radial: true; direction: -1; radius: .232 }
+            materials: [magazineToolMaterial]
         }
 
 

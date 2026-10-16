@@ -235,8 +235,12 @@ int main(int argc,char **argv) {
     const int dialogCaptureIndex=args.indexOf("--dialog-capture");
     if(dialogCaptureIndex>=0){
         QTimer::singleShot(2000,&app,[&]{
-            QMetaObject::invokeMethod(window,"showPcni");
-            if(dialogCaptureIndex+2<args.size())pcni.load(args.value(dialogCaptureIndex+2));
+            const QString what=args.value(dialogCaptureIndex+2);
+            // "data:N" opens the machine data dialog on tab N, anything else is a program.
+            if(what.startsWith("data:"))QMetaObject::invokeMethod(window,"showMachineData",Q_ARG(QVariant,QVariant(what.mid(5).toInt())));
+            else {QMetaObject::invokeMethod(window,"showPcni");if(!what.isEmpty())pcni.load(what);
+                QFile points(args.value(dialogCaptureIndex+1)+".points.json");
+                if(points.open(QIODevice::WriteOnly))points.write(QJsonDocument(QJsonArray::fromVariantList(pcni.property("points").toList())).toJson(QJsonDocument::Compact));}
             QTimer::singleShot(1500,&app,[&]{app.exit(window->grabWindow().save(args.value(dialogCaptureIndex+1))?0:1);});
         });
         return app.exec();

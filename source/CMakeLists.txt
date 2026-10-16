@@ -3,7 +3,7 @@ project(SolidSimNative VERSION 0.3 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 find_package(Qt6 6.8 REQUIRED COMPONENTS Quick QuickControls2 Quick3D)
 qt_standard_project_setup(REQUIRES 6.8)
-qt_add_executable(SolidSimNative WIN32 main.cpp Motion.h Pcni.h StockGeometry.h LiveCni.h MachineData.h Machining.h VigorProfile.h)
+qt_add_executable(SolidSimNative WIN32 main.cpp Motion.h Pcni.h StockGeometry.h LiveCni.h MachineData.h Machining.h VigorProfile.h ToolAngles.h)
 qt_add_qml_module(SolidSimNative URI Poyraz.Native VERSION 1.0 SOURCES GridInstances.h DrillInstances.h MagazineInstances.h QML_FILES Main.qml Machine.qml Vigor.qml CameraNavigation.qml)
 target_link_libraries(SolidSimNative PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Quick3D)
 
@@ -36,3 +36,6 @@ target_link_libraries(LiveCniChecks PRIVATE Qt6::Core)
 
 qt_add_executable(PerformanceChecks EXCLUDE_FROM_ALL tools/performance_checks.cpp tools/reference_machining.h tools/reference_pcni.h Motion.h Pcni.h StockGeometry.h Machining.h)
 target_link_libraries(PerformanceChecks PRIVATE Qt6::Quick Qt6::Quick3D)
+
+qt_add_executable(VCutChecks EXCLUDE_FROM_ALL tools/vcut_checks.cpp StockGeometry.h)
+target_link_libraries(VCutChecks PRIVATE Qt6::Quick Qt6::Quick3D)

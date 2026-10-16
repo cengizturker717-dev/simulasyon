@@ -88,7 +88,9 @@ ApplicationWindow {
         navigation.setDistance(root.vigorScene ? 4000 : 8500)
     }
     function showPcni() { programDialog.open() }
-    function showMachineData() { dataDialog.open() }
+    function showMachineData(tab) { dataTabs.currentIndex = tab === undefined ? 0 : tab; dataDialog.open() }
+    // A changed V angle reaches the cut once the program is read again.
+    function reloadProgramPreview() { if (!motion.liveMode && pcni.path.length) pcni.load(pcni.path) }
     function inspectionView() {
         navigation.flushDrag()
         orbit.position=Qt.vector3d(0,760,0)
@@ -236,10 +238,26 @@ ApplicationWindow {
                 }
                 ListView {
                     clip: true; spacing: 4; model: dataDialog.visible && dataTabs.currentIndex === 2 ? machineData.tools : []
+                    header: Label { width: ListView.view ? ListView.view.width : 0; height: 34; leftPadding: 9; verticalAlignment: Text.AlignVCenter; wrapMode: Text.Wrap; color: "#9ee1b7"
+                        text: "V: açılı (V uçlu) takım · açı = uç açısı (90° → yanaklar 45°). Simülatörde tutulur, Dati'ye yazılmaz; programı yeniden okuyunca kesime uygulanır." }
                     delegate: Rectangle {
                         required property var modelData
-                        width: ListView.view.width; height: 42; radius: 5; color: "#253247"
-                        Label { anchors.fill: parent; anchors.margins: 9; text: "T"+modelData.id+"   "+modelData.name+"   Ø"+modelData.diameter.toFixed(2)+" · L "+modelData.length.toFixed(2)+" mm"+(modelData.pocket>0?" · Cep "+modelData.pocket:"") }
+                        width: ListView.view.width; height: 42; radius: 5; color: modelData.angle > 0 ? "#2b3a55" : "#253247"
+                        RowLayout {
+                            anchors.fill: parent; anchors.leftMargin: 9; anchors.rightMargin: 6; spacing: 8
+                            Label { Layout.fillWidth: true; elide: Text.ElideRight; text: "T"+modelData.id+"   "+modelData.name+"   Ø"+modelData.diameter.toFixed(2)+" · L "+modelData.length.toFixed(2)+" mm"+(modelData.pocket>0?" · Cep "+modelData.pocket:"")+(modelData.angle>0?" · V "+modelData.angle+"°":"") }
+                            CheckBox {
+                                id: vTool; text: "V"; checked: modelData.angle > 0
+                                onToggled: { machineData.setToolAngle(modelData.name, checked ? angleBox.value : 0); root.reloadProgramPreview() }
+                            }
+                            SpinBox {
+                                id: angleBox; from: 10; to: 170; stepSize: 5; editable: true; enabled: vTool.checked
+                                value: modelData.angle > 0 ? modelData.angle : 90
+                                textFromValue: function(v) { return v + "°" }
+                                valueFromText: function(t) { return parseInt(t) }
+                                onValueModified: if (vTool.checked) { machineData.setToolAngle(modelData.name, value); root.reloadProgramPreview() }
+                            }
+                        }
                     }
                 }
             }

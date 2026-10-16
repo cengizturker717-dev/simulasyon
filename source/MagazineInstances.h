@@ -24,6 +24,9 @@ class MagazineInstances : public QQuick3DInstancing {
     Q_PROPERTY(double templateAngle MEMBER templateAngle NOTIFY magazineChanged)
     // +1: CrtMAG grows counter-clockwise seen from above; -1: clockwise.
     Q_PROPERTY(double direction MEMBER direction NOTIFY magazineChanged)
+    // 0: the template as is (forks, holders). 1: tool body (#Cylinder) and
+    // 2: V tip (#Cone), sized per pocket from datpunt DIAM/LUNG and the V angle.
+    Q_PROPERTY(int part MEMBER part NOTIFY magazineChanged)
 public:
     explicit MagazineInstances(QQuick3DObject* parent=nullptr):QQuick3DInstancing(parent) {
         connect(this,&MagazineInstances::magazineChanged,this,[this]{dirty=true;markDirty();});
@@ -61,7 +64,30 @@ private:
                     const double dx=(pocket.value("x").toDouble()-x0)/1000.0,dz=(pocket.value("y").toDouble()-y0)/1000.0;
                     if(std::isfinite(dx)&&std::isfinite(dz))position+=QVector3D(float(dx),0,float(dz));
                 }
-                const auto entry=calculateTableEntry(position,QVector3D(1,1,1),rotation,Qt::white);
+                QVector3D scale(1,1,1);
+                if(part>0) {
+                    // Holder template: nose at 0.10 m, gauge plane ~0.14 m above its base.
+                    // The tip sits LUNG below the gauge plane; Qt primitives are 100 units.
+                    constexpr double nose=.10,gauge=.14;
+                    double d=pocket.value("diameter").toDouble()/1000,length=pocket.value("length").toDouble()/1000;
+                    if(!(d>0&&d<.1))d=.006;
+                    if(!(length>gauge-nose&&length<.4))length=.1;
+                    const double tip=gauge-length,angle=pocket.value("tipAngle").toDouble();
+                    const double cone=angle>0&&angle<180?(d/2)/std::tan(angle*3.14159265358979323846/360):0;
+                    const double coneHeight=std::min(cone,nose-tip);
+                    if(part==1) {
+                        const double top=nose,bottom=tip+coneHeight;
+                        if(top-bottom<=1e-4)continue;
+                        position+=QVector3D(0,float((top+bottom)/2),0);
+                        scale=QVector3D(float(d/100),float((top-bottom)/100),float(d/100));
+                    } else {
+                        if(coneHeight<=0)continue;
+                        position+=QVector3D(0,float(tip+coneHeight/2),0);
+                        scale=QVector3D(float(d/100),float(coneHeight/100),float(d/100));
+                        rotation.setX(180);   // apex down
+                    }
+                }
+                const auto entry=calculateTableEntry(position,scale,rotation,Qt::white);
                 buffer.append(reinterpret_cast<const char*>(&entry),sizeof(entry));
                 lastPlacements.append(QVariantMap{{"pocket",pocket.value("pocket")},{"x",position.x()},{"y",position.y()},{"z",position.z()},{"turn",rotation.y()}});
             }
@@ -71,6 +97,6 @@ private:
     QVariantList pockets,lastPlacements;
     bool radial=false,occupiedOnly=false,dirty=true;
     QVector3D origin;
-    double radius=0,baseAngle=0,templateAngle=0,direction=1;
+    double radius=0,baseAngle=0,templateAngle=0,direction=1;int part=0;
     QByteArray buffer;
 };

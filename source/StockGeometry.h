@@ -39,9 +39,14 @@ public:
     void cut(double ax,double ay,double bx,double by,bool travel) {
         cutProfile(ax,ay,dep,bx,by,dep,dia,travel);
     }
-    void cutProfile(double ax,double ay,double ad,double bx,double by,double bd,double diameter,bool travel) {
+    // tipAngle: included angle of a V cutter in degrees (0 = flat bottom). A V
+    // cutter's depth falls off by distance/tan(angle/2) from the path centre, so
+    // the groove is only as wide as the depth allows (never wider than diameter).
+    void cutProfile(double ax,double ay,double ad,double bx,double by,double bd,double diameter,bool travel,double tipAngle=0) {
         if(travel||cells.empty()||!std::isfinite(ax)||!std::isfinite(ay)||!std::isfinite(bx)||!std::isfinite(by)||!std::isfinite(ad)||!std::isfinite(bd)||!std::isfinite(diameter)||diameter<=0||diameter>80||std::max(ad,bd)<=0) return;
+        const double flank=std::isfinite(tipAngle)&&tipAngle>0&&tipAngle<180?std::tan(tipAngle*3.14159265358979323846/360.0):0;
         double radius=diameter/2, vx=bx-ax,vy=by-ay,len=vx*vx+vy*vy;
+        if(flank>0)radius=std::min(radius,std::max(ad,bd)*flank);
         int x0=std::clamp(int(std::floor((std::min(ax,bx)-radius)/dx)),0,nx-1);
         int x1=std::clamp(int(std::floor((std::max(ax,bx)+radius)/dx)),0,nx-1);
         int y0=std::clamp(int(std::floor((std::min(ay,by)-radius)/dy)),0,ny-1);
@@ -64,7 +69,8 @@ public:
           for(int x=rowFirst;x<=rowLast;++x) {
             double cx=(x+.5)*dx,cy=(y+.5)*dy;
             double t=len>0?std::clamp(((cx-ax)*vx+(cy-ay)*vy)/len,0.0,1.0):0;
-            if(std::hypot(cx-ax-t*vx,cy-ay-t*vy)>radius) continue;
+            const double distance=std::hypot(cx-ax-t*vx,cy-ay-t*vy);
+            if(distance>radius) continue;
             double cuttingDepth=std::max(ad,bd);
             if(len>0&&ad!=bd) {
                 const double projection=((cx-ax)*vx+(cy-ay)*vy)/len;
@@ -73,6 +79,7 @@ public:
                 const double contact=std::clamp(projection+(bd>ad?reach:-reach),0.0,1.0);
                 cuttingDepth=ad+(bd-ad)*contact;
             }
+            if(flank>0){cuttingDepth-=distance/flank;if(cuttingDepth<=0)continue;}
             float& cell=cells[y*nx+x];float target=float(thick-std::clamp(cuttingDepth,0.0,thick));
             if(cell>target) {volume+=(cell-target)*dx*dy;cell=target;altered=true;
                 dirtyCell(x,y);
