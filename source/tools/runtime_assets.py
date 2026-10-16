@@ -10,7 +10,8 @@ def runtime_assets(scene: Path, project_root: Path):
             continue
         files.add((scene.parent/reference).resolve())
     if 'merged/static_' in text:
-        files.update(scene.parent/'merged'/f'static_{profile}.mesh' for profile in ('2142','2136','2128'))
+        suffix='_nomag' if '"_nomag.mesh"' in text else ''
+        files.update(scene.parent/'merged'/f'static_{profile}{suffix}.mesh' for profile in ('2142','2136','2128'))
     else:
         files.add(scene.parent/'cleanedstatic/meshes/l_o_altma1_009_mesh.mesh')
         files.update(scene.parent/'variants'/profile/'static.mesh' for profile in ('2136','2128'))

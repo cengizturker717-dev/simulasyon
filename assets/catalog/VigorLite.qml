@@ -37,6 +37,10 @@ Node {
     readonly property real drillBodyLift: drillRestTip - (.704551 + node.axisZ + .6737665)
     readonly property bool pistonEngaged: node.drilling && machining.depth > 0 && !machining.error &&
         (machining.liveJob ? machining.status.indexOf("Canlı işleme") === 0 : motion.cutting)
+    readonly property var magazinePockets: machineData.magazineTools
+    readonly property int magazinePocketCount: machineData.magazinePocketCount
+    readonly property bool rotaryMagazine: machineData.rotaryMagazine
+    readonly property bool magazineKnown: magazinePocketCount > 0
 
     // Resources
     PrincipledMaterial {
@@ -230,7 +234,7 @@ Node {
                             Model {
                                 id: l_o_altma1_009
                                 objectName: "LÇoðaltma1.009"
-                                source: "merged/static_" + vigorProfile.model + ".mesh"
+                                source: "merged/static_" + vigorProfile.model + "_nomag.mesh"
                                 materials: [paint__234__232__240__255__material, paint__0__0__0__255__material, paint__185__188__191__255__material, paint__231__88__7__255__material, paint__175__178__181__255__material]
                             }
                         }
@@ -272,14 +276,80 @@ Node {
             ]
         }
 
+        // Tool magazines follow Dati (datmag CMB_*): only the active type is drawn,
+        // one fork per configured pocket at its own data position, and a holder
+        // only where datpunt assigns a tool. Without Dati both CAD magazines stay.
+        Model {
+            objectName: "ROTARYMAG_CAD"
+            visible: !node.magazineKnown
+            position: Qt.vector3d(node.axisX, .704551, 0)
+            source: "meshes/rotarymag_cad.mesh"
+            materials: [paint__55__55__55__255__material, paint__185__188__191__255__material]
+        }
+        Model {
+            objectName: "FIXEDMAG_CAD"
+            visible: !node.magazineKnown
+            position: Qt.vector3d(.391593, .491951, 0)
+            source: "meshes/fixedmag_cad.mesh"
+            materials: [paint__234__232__240__255__material, paint__0__0__0__255__material]
+        }
+        Model {
+            objectName: "FIXEDMAG_BODY"
+            visible: node.magazineKnown && !node.rotaryMagazine
+            position: Qt.vector3d(.391593, .491951, 0)
+            source: "meshes/fixedmag_body.mesh"
+            materials: [paint__234__232__240__255__material]
+        }
+        Model {
+            objectName: "FIXEDMAG_POCKETS"
+            visible: node.magazineKnown && !node.rotaryMagazine
+            position: Qt.vector3d(0, .491951, 0)
+            source: "meshes/fixedmag_fork.mesh"
+            // Pocket 1 sits on the CAD's first fork; the others follow XMAG/YMAG.
+            instancing: MagazineInstances { objectName: "fixedPocketInstances"; pockets: node.magazinePockets; origin: Qt.vector3d(-1.51158, 0, -.9809) }
+            materials: [paint__234__232__240__255__material]
+        }
+        Model {
+            objectName: "FIXEDMAG_HOLDERS"
+            visible: node.magazineKnown && !node.rotaryMagazine
+            source: "meshes/magazine_holder.mesh"
+            instancing: MagazineInstances { objectName: "fixedHolderInstances"; pockets: node.magazinePockets; occupiedOnly: true; origin: Qt.vector3d(-1.48069, .957855, -.9809) }
+            materials: [paint__0__0__0__255__material]
+        }
+        Model {
+            objectName: "ROTARYMAG_BODY"
+            visible: node.magazineKnown && node.rotaryMagazine
+            position: Qt.vector3d(node.axisX, .704551, 0)
+            source: "meshes/rotarymag_body.mesh"
+            materials: [paint__55__55__55__255__material, paint__185__188__191__255__material]
+        }
+        Model {
+            objectName: "ROTARYMAG_POCKETS"
+            visible: node.magazineKnown && node.rotaryMagazine
+            position: Qt.vector3d(node.axisX + .08666, .704551, -1.76251)
+            source: "meshes/rotarymag_fork.mesh"
+            // Pocket 1 faces the tool-change side (+z, toward the spindle); the
+            // others turn by their CrtMAG difference.
+            instancing: MagazineInstances { objectName: "rotaryPocketInstances"; pockets: node.magazinePockets; radial: true; templateAngle: 161.38 }
+            materials: [paint__55__55__55__255__material]
+        }
+        Model {
+            objectName: "ROTARYMAG_HOLDERS"
+            visible: node.magazineKnown && node.rotaryMagazine
+            position: Qt.vector3d(node.axisX + .08666, .704551 + .3569, -1.76251)
+            source: "meshes/magazine_holder.mesh"
+            instancing: MagazineInstances { objectName: "rotaryHolderInstances"; pockets: node.magazinePockets; radial: true; occupiedOnly: true; radius: .232 }
+            materials: [paint__0__0__0__255__material]
+        }
+
 
 
         Model {
             id: sim_BRIDGE
             objectName: "SIM_BRIDGE"
             position: Qt.vector3d(node.axisX,0,0)
-            source: "merged/bridge.mesh"
-            materials: [paint__185__188__191__255__material, paint__234__232__240__255__material, paint__0__0__0__255__material, paint__231__88__7__255__material, paint__175__178__181__255__material, paint__55__55__55__255__material, paint__137__84__10__255__material, paint__231__175__6__86__material, frontGlassMaterial]
+            source: "merged/bridge_nomag.mesh"
+            materials: [paint__185__188__191__255__material, paint__234__232__240__255__material, paint__0__0__0__255__material, paint__231__88__7__255__material, paint__175__178__181__255__material, paint__137__84__10__255__material, paint__231__175__6__86__material, frontGlassMaterial]
         }
         Node {
             id: sim_CARRIAGE

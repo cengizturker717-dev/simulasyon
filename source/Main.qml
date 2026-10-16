@@ -217,11 +217,19 @@ ApplicationWindow {
                 }
                 ListView {
                     clip: true; spacing: 4; model: dataDialog.visible && dataTabs.currentIndex === 1 ? machineData.magazineTools : []
-                    Label { anchors.centerIn: parent; visible: machineData.magazineTools.length===0; text: "Dati takım tablosunda magazin cebine atanmış takım yok"; color: "#edbe75" }
+                    header: Rectangle {
+                        width: ListView.view ? ListView.view.width : 0; height: 48; radius: 5; color: "#182536"
+                        Label { anchors.fill: parent; anchors.margins: 10; verticalAlignment: Text.AlignVCenter; font.bold: true; color: "#9ee1b7"; text: machineData.magazineTypeName+" magazin · "+machineData.magazinePocketCount+" yuva · "+machineData.magazineTools.filter(p => p.occupied).length+" dolu" }
+                    }
+                    Label { anchors.centerIn: parent; visible: machineData.magazineTools.length===0; text: "Dati dosyasında etkin magazin yuvası bulunamadı"; color: "#edbe75" }
                     delegate: Rectangle {
                         required property var modelData
-                        width: ListView.view.width; height: 42; radius: 5; color: "#253247"
-                        Label { anchors.fill: parent; anchors.margins: 9; text: "Magazin "+modelData.magazine+" · Cep "+modelData.pocket+"   "+modelData.name+"   Ø"+modelData.diameter.toFixed(2)+" · L "+modelData.length.toFixed(2)+" mm" }
+                        width: ListView.view.width; height: 48; radius: 5; color: modelData.occupied ? "#253c35" : "#202833"
+                        Label {
+                            anchors.fill: parent; anchors.margins: 9; verticalAlignment: Text.AlignVCenter
+                            color: modelData.occupied ? "#e5edf7" : "#8695a6"
+                            text: "Cep "+modelData.pocket+"   "+(modelData.occupied ? "T"+modelData.toolId+" · "+modelData.name+"   Ø"+modelData.diameter.toFixed(2)+" · L "+modelData.length.toFixed(2)+" mm" : "Boş")
+                        }
                     }
                 }
                 ListView {

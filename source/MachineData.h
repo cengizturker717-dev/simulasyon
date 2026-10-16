@@ -5,6 +5,7 @@
 #include <QDir>
 #include <QVariantList>
 #include <QTimer>
+#include <algorithm>
 #include <cmath>
 
 // Read-only view of NcOne Dati files. It never changes machine data.
@@ -16,6 +17,10 @@ class MachineData : public QObject {
     Q_PROPERTY(QVariantList origins READ origins NOTIFY changed)
     Q_PROPERTY(QVariantList tools READ tools NOTIFY changed)
     Q_PROPERTY(QVariantList magazineTools READ magazineTools NOTIFY changed)
+    Q_PROPERTY(int magazineType READ magazineType NOTIFY changed)
+    Q_PROPERTY(QString magazineTypeName READ magazineTypeName NOTIFY changed)
+    Q_PROPERTY(int magazinePocketCount READ magazinePocketCount NOTIFY changed)
+    Q_PROPERTY(bool rotaryMagazine READ rotaryMagazine NOTIFY changed)
     Q_PROPERTY(QVariantList verticalDrills READ verticalDrills NOTIFY changed)
     Q_PROPERTY(int rearLeftOrigin READ rearLeftOrigin NOTIFY changed)
     Q_PROPERTY(int rearRightOrigin READ rearRightOrigin NOTIFY changed)
@@ -28,6 +33,10 @@ public:
     QString root()const{return base;} QString status()const{return message;}
     QVariantList axes()const{return axisRows;} QVariantList origins()const{return originRows;}
     QVariantList tools()const{return toolRows;} QVariantList magazineTools()const{return magazineRows;}
+    int magazineType()const{return activeMagazineType;}
+    QString magazineTypeName()const{return activeMagazineType==2?"Döner":activeMagazineType>0?"Sabit":"Tanımsız";}
+    int magazinePocketCount()const{return magazineRows.size();}
+    bool rotaryMagazine()const{return activeMagazineType==2;}
     QVariantList verticalDrills()const{return drillRows;}
     int rearLeftOrigin()const{return rearLeft;} int rearRightOrigin()const{return rearRight;}
     int frontLeftOrigin()const{return frontLeft;} int frontRightOrigin()const{return frontRight;}
@@ -36,7 +45,7 @@ public:
     double axisReference(int i)const{return i>=0&&i<references.size()?references[i]:0;}
     void setRoot(const QString& value){base=QDir::cleanPath(value);refresh();}
     Q_INVOKABLE void refresh(){
-        axisRows.clear();originRows.clear();toolRows.clear();magazineRows.clear();drillRows.clear();mins.clear();maxs.clear();references.clear();
+        axisRows.clear();originRows.clear();toolRows.clear();magazineRows.clear();drillRows.clear();mins.clear();maxs.clear();references.clear();activeMagazineType=0;
         const QString data=base+"/Dati/";
         const QString axisFile=data+"datassi_01_dat.ini",originFile=data+"datvari_dat.ini";
         const QString generalFile=data+"fametec_dat.ini",toolFile=data+"datpunt_dat.ini",magFile=data+"datmag_01_dat.ini";
@@ -64,15 +73,50 @@ public:
         QSettings gen(generalFile,QSettings::IniFormat);gen.beginGroup("GENERAL000");
         rearLeft=gen.value("ORIG_SX").toInt();rearRight=gen.value("ORIG_DX").toInt();
         frontLeft=gen.value("ORIG_SXP").toInt();frontRight=gen.value("ORIG_DXP").toInt();gen.endGroup();
-        QHash<int,int> pocketMagazine;QSettings mags(magFile,QSettings::IniFormat);
-        for(const QString& g:mags.childGroups()) if(g.startsWith("CMB_")){mags.beginGroup(g);pocketMagazine.insert(mags.value("PMAG").toInt(),mags.value("NMAG").toInt());mags.endGroup();}
+        QVariantList configuredPockets;QSettings mags(magFile,QSettings::IniFormat);
+        for(const QString& g:mags.childGroups()) if(g.startsWith("CMB_")){
+            mags.beginGroup(g);
+            const int pocket=mags.value("PMAG").toInt(),type=mags.value("TIPO").toInt();
+            const bool disabled=mags.value("DISABLE").toInt()!=0;
+            if(!disabled&&pocket>0) {
+                if(activeMagazineType==0)activeMagazineType=type;
+                if(type==activeMagazineType)configuredPockets.append(QVariantMap{
+                    {"pocket",pocket},{"magazine",mags.value("NMAG").toInt()},{"type",type},
+                    {"angle",mags.value("CrtMAG").toDouble()},{"machineAngle",mags.value("CrMAG").toDouble()},
+                    {"x",mags.value("XMAG").toDouble()},{"y",mags.value("YMAG").toDouble()},
+                    {"z",mags.value("ZMAG").toDouble()},{"occupied",false},{"toolId",0},
+                    {"name",QString()},{"diameter",0.0},{"length",0.0}});
+            }
+            mags.endGroup();
+        }
+        std::sort(configuredPockets.begin(),configuredPockets.end(),[](const QVariant& a,const QVariant& b){
+            return a.toMap().value("pocket").toInt()<b.toMap().value("pocket").toInt();
+        });
         QSettings tl(toolFile,QSettings::IniFormat);
         for(const QString& g:tl.childGroups()) if(g.startsWith("PANT_")){
             tl.beginGroup(g);int pocket=tl.value("PMAG").toInt();QVariantMap row{{"id",g.mid(5).toInt()},
                 {"name",tl.value("NOME").toString()},{"diameter",tl.value("DIAM").toDouble()},
-                {"length",tl.value("LUNG").toDouble()},{"pocket",pocket},{"magazine",pocketMagazine.value(pocket,0)},
+                {"length",tl.value("LUNG").toDouble()},{"pocket",pocket},{"magazine",0},
                 {"maxRpm",tl.value("VMAX").toDouble()},{"workRpm",tl.value("VROT").toDouble()}};
-            toolRows.append(row);if(pocket>0)magazineRows.append(row);tl.endGroup();
+            toolRows.append(row);tl.endGroup();
+        }
+        for(auto& value:configuredPockets) {
+            auto pocket=value.toMap();
+            for(const auto& toolValue:toolRows) {
+                const auto tool=toolValue.toMap();
+                if(tool.value("pocket").toInt()!=pocket.value("pocket").toInt())continue;
+                pocket["occupied"]=true;pocket["toolId"]=tool.value("id");pocket["name"]=tool.value("name");
+                pocket["diameter"]=tool.value("diameter");pocket["length"]=tool.value("length");break;
+            }
+            value=pocket;magazineRows.append(pocket);
+        }
+        for(auto& value:toolRows) {
+            auto tool=value.toMap();
+            for(const auto& pocketValue:magazineRows) {
+                const auto pocket=pocketValue.toMap();
+                if(tool.value("pocket").toInt()==pocket.value("pocket").toInt()) {tool["magazine"]=pocket.value("magazine");break;}
+            }
+            value=tool;
         }
         QSettings mand(data+"protmand_dat.ini",QSettings::IniFormat),assigned(data+"datconf_01_dat.ini",QSettings::IniFormat),offsets(data+"datmand_01_dat.ini",QSettings::IniFormat);
         for(const QString& group:mand.childGroups()) {
@@ -88,7 +132,9 @@ public:
                 break;
             }
         }
-        message=QString("%1 eksen · %2 orijin · %3 takım · magazinde %4 takım").arg(axisRows.size()).arg(originRows.size()).arg(toolRows.size()).arg(magazineRows.size());
+        int occupied=0;for(const auto& value:magazineRows)if(value.toMap().value("occupied").toBool())++occupied;
+        message=QString("%1 eksen · %2 orijin · %3 takım · %4 magazin: %5 yuva, %6 takım")
+            .arg(axisRows.size()).arg(originRows.size()).arg(toolRows.size()).arg(magazineTypeName()).arg(magazineRows.size()).arg(occupied);
         signature=fileSignature();
         emit changed();
     }
@@ -96,7 +142,7 @@ signals:void changed();
 private:
     QString base="C:/CNI/Ncone/MachineData/POYRAZ_VIGOR2136_ETH",message;
     QVariantList axisRows,originRows,toolRows,magazineRows,drillRows;QList<double> mins,maxs,references;
-    int rearLeft=0,rearRight=0,frontLeft=0,frontRight=0;
+    int rearLeft=0,rearRight=0,frontLeft=0,frontRight=0,activeMagazineType=0;
     QTimer poll;QString signature;
     QString fileSignature()const{
         QString s;for(const QString& name:QStringList{"datassi_01_dat.ini","datvari_dat.ini","fametec_dat.ini","datpunt_dat.ini","datmag_01_dat.ini","protmand_dat.ini","datconf_01_dat.ini","datmand_01_dat.ini"}){
