@@ -1,0 +1,9 @@
+partial_surface_passed=1
+through_surface_passed=1
+cell_mm=2
+flat_triangles=2156
+cut_triangles=35224
+last_updated_tiles=2
+median_update_ms=0.6828
+p95_update_ms=1.1875
+max_update_ms=1.4834

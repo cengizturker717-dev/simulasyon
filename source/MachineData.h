@@ -5,6 +5,7 @@
 #include <QDir>
 #include <QVariantList>
 #include <QTimer>
+#include <cmath>
 
 // Read-only view of NcOne Dati files. It never changes machine data.
 class MachineData : public QObject {
@@ -15,6 +16,7 @@ class MachineData : public QObject {
     Q_PROPERTY(QVariantList origins READ origins NOTIFY changed)
     Q_PROPERTY(QVariantList tools READ tools NOTIFY changed)
     Q_PROPERTY(QVariantList magazineTools READ magazineTools NOTIFY changed)
+    Q_PROPERTY(QVariantList verticalDrills READ verticalDrills NOTIFY changed)
     Q_PROPERTY(int rearLeftOrigin READ rearLeftOrigin NOTIFY changed)
     Q_PROPERTY(int rearRightOrigin READ rearRightOrigin NOTIFY changed)
     Q_PROPERTY(int frontLeftOrigin READ frontLeftOrigin NOTIFY changed)
@@ -26,6 +28,7 @@ public:
     QString root()const{return base;} QString status()const{return message;}
     QVariantList axes()const{return axisRows;} QVariantList origins()const{return originRows;}
     QVariantList tools()const{return toolRows;} QVariantList magazineTools()const{return magazineRows;}
+    QVariantList verticalDrills()const{return drillRows;}
     int rearLeftOrigin()const{return rearLeft;} int rearRightOrigin()const{return rearRight;}
     int frontLeftOrigin()const{return frontLeft;} int frontRightOrigin()const{return frontRight;}
     double axisMin(int i)const{return i>=0&&i<mins.size()?mins[i]:0;}
@@ -33,7 +36,7 @@ public:
     double axisReference(int i)const{return i>=0&&i<references.size()?references[i]:0;}
     void setRoot(const QString& value){base=QDir::cleanPath(value);refresh();}
     Q_INVOKABLE void refresh(){
-        axisRows.clear();originRows.clear();toolRows.clear();magazineRows.clear();mins.clear();maxs.clear();references.clear();
+        axisRows.clear();originRows.clear();toolRows.clear();magazineRows.clear();drillRows.clear();mins.clear();maxs.clear();references.clear();
         const QString data=base+"/Dati/";
         const QString axisFile=data+"datassi_01_dat.ini",originFile=data+"datvari_dat.ini";
         const QString generalFile=data+"fametec_dat.ini",toolFile=data+"datpunt_dat.ini",magFile=data+"datmag_01_dat.ini";
@@ -71,6 +74,20 @@ public:
                 {"maxRpm",tl.value("VMAX").toDouble()},{"workRpm",tl.value("VROT").toDouble()}};
             toolRows.append(row);if(pocket>0)magazineRows.append(row);tl.endGroup();
         }
+        QSettings mand(data+"protmand_dat.ini",QSettings::IniFormat),assigned(data+"datconf_01_dat.ini",QSettings::IniFormat),offsets(data+"datmand_01_dat.ini",QSettings::IniFormat);
+        for(const QString& group:mand.childGroups()) {
+            const QString channel=mand.value(group+"/name").toString();
+            bool channelOk=false;const int number=channel.mid(1).toInt(&channelOk);
+            if(!channel.startsWith('T')||!channelOk||number<1||mand.value(group+"/type").toString()!="VERT")continue;
+            const QString toolName=assigned.value(group+"/UTE00").toString();
+            for(const auto& value:toolRows) {
+                const auto tool=value.toMap();if(toolName.isEmpty()||tool["name"].toString()!=toolName||tool["diameter"].toDouble()<=0)continue;
+                bool okX=false,okY=false;const double x=offsets.value(group+"/OFFX").toDouble(&okX),y=offsets.value(group+"/OFFY").toDouble(&okY);
+                if(okX&&okY&&std::isfinite(x)&&std::isfinite(y)&&std::abs(x)<500&&std::abs(y)<500)
+                    drillRows.append(QVariantMap{{"tool",number},{"name",toolName},{"diameter",tool["diameter"]},{"mountX",x},{"mountY",y}});
+                break;
+            }
+        }
         message=QString("%1 eksen · %2 orijin · %3 takım · magazinde %4 takım").arg(axisRows.size()).arg(originRows.size()).arg(toolRows.size()).arg(magazineRows.size());
         signature=fileSignature();
         emit changed();
@@ -78,11 +95,11 @@ public:
 signals:void changed();
 private:
     QString base="C:/CNI/Ncone/MachineData/POYRAZ_VIGOR2136_ETH",message;
-    QVariantList axisRows,originRows,toolRows,magazineRows;QList<double> mins,maxs,references;
+    QVariantList axisRows,originRows,toolRows,magazineRows,drillRows;QList<double> mins,maxs,references;
     int rearLeft=0,rearRight=0,frontLeft=0,frontRight=0;
     QTimer poll;QString signature;
     QString fileSignature()const{
-        QString s;for(const QString& name:QStringList{"datassi_01_dat.ini","datvari_dat.ini","fametec_dat.ini","datpunt_dat.ini","datmag_01_dat.ini"}){
+        QString s;for(const QString& name:QStringList{"datassi_01_dat.ini","datvari_dat.ini","fametec_dat.ini","datpunt_dat.ini","datmag_01_dat.ini","protmand_dat.ini","datconf_01_dat.ini","datmand_01_dat.ini"}){
             QFileInfo f(base+"/Dati/"+name);s+=name+":"+QString::number(f.size())+":"+QString::number(f.lastModified().toMSecsSinceEpoch())+";";
         }return s;
     }

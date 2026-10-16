@@ -13,3 +13,13 @@ work/
 Thumbs.db
 Desktop.ini
 
+
+# Diagnostic scene copies and caches
+assets/catalog/diagstatic*/
+assets/catalog/removetest/
+__pycache__/
+render-backend.txt
+
+# Local machine selection and data paths
+vigor-settings.ini
+

@@ -30,14 +30,6 @@ Node {
         alphaMode: PrincipledMaterial.Opaque
     }
     PrincipledMaterial {
-        id: paint__55__55__55__255__material
-        objectName: "paint_(55, 55, 55, 255)"
-        baseColor: "#ff373737"
-        roughness: 0.75
-        cullMode: PrincipledMaterial.NoCulling
-        alphaMode: PrincipledMaterial.Opaque
-    }
-    PrincipledMaterial {
         id: paint__231__88__7__255__material
         objectName: "paint_(231, 88, 7, 255)"
         baseColor: "#ffe75807"
@@ -79,7 +71,6 @@ Node {
                                 paint__234__232__240__255__material,
                                 paint__0__0__0__255__material,
                                 paint__185__188__191__255__material,
-                                paint__55__55__55__255__material,
                                 paint__231__88__7__255__material,
                                 paint__0__0__0__255__material,
                                 paint__175__178__181__255__material

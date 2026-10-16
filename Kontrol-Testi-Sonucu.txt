@@ -1,0 +1,68 @@
+SOLIDSIM NATIVE KONTROL BILGISAYARI TESTI
+Tarih: 2026-10-06 01:11:24
+Yerel stres testi: uygulama iki mantiksal islemciye sinirli.
+Program testi: 0
+Kesim modeli testi: 0
+Kesim yuzeyi / yuk testi: 0
+partial_surface_passed=1
+through_surface_passed=1
+cell_mm=2
+flat_triangles=2156
+cut_triangles=35224
+last_updated_tiles=2
+median_update_ms=0.6828
+p95_update_ms=1.1875
+max_update_ms=1.4834
+
+Surucu=d3d11 kesim=False kod=0
+frames=309
+avg_fps=30.9703
+median_ms=33.1635
+p95_ms=64.0701
+max_ms=75.0397
+frames_over_100ms=0
+cutting=0
+viewport_width=1440
+viewport_height=900
+stock_triangles=0
+
+Surucu=d3d11 kesim=True kod=0
+frames=369
+avg_fps=37.0202
+median_ms=21.4183
+p95_ms=65.433
+max_ms=80.5959
+frames_over_100ms=0
+cutting=1
+viewport_width=1440
+viewport_height=900
+stock_triangles=2902
+
+Surucu=opengl kesim=False kod=0
+frames=306
+avg_fps=30.6885
+median_ms=33.0572
+p95_ms=34.6656
+max_ms=36.2992
+frames_over_100ms=0
+cutting=0
+viewport_width=1440
+viewport_height=900
+stock_triangles=0
+
+Surucu=opengl kesim=True kod=0
+frames=377
+avg_fps=37.7513
+median_ms=32.2601
+p95_ms=34.688
+max_ms=38.1712
+frames_over_100ms=0
+cutting=1
+viewport_width=1440
+viewport_height=900
+stock_triangles=2884
+
+Secilen surucu: opengl
+Hareket ve kesimde en dusuk FPS: 30.69
+Hareket ve kesimde en yuksek p95 ms: 34.69
+SONUC: UYUMLU - hareket ve kesim yukunde performans yeterli.

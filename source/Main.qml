@@ -11,8 +11,8 @@ ApplicationWindow {
     width: 1440; height: 900
     minimumWidth: 1100; minimumHeight: 740
     onVisibilityChanged: { if (root.visibility === Window.Minimized) motion.pause() }
-    visible: true
-    title: "POYRAZ | SolidSim Native — 3D HMI Prototipi"
+    visibility: Window.Maximized
+    title: "POYRAZ | Vigor"
     color: "#11161e"
     palette.window: "#1b2430"
     palette.windowText: "#e5edf7"
@@ -33,9 +33,11 @@ ApplicationWindow {
     property bool convertedModel: modelUrl.toString().toLowerCase().endsWith(".qml")
     property var convertedComponent: null
     property var convertedObject: null
+    property var demoObject: null
     property string modelState: !externalModel ? "demo" : convertedModel ? (convertedObject ? "loaded" : (convertedComponent && convertedComponent.status === Component.Error ? "error" : "loading")) : loader.status === RuntimeLoader.Success ? "loaded" : loader.status === RuntimeLoader.Error ? "error" : "loading"
     property bool benchmarkMode: false
-    property real homeDistance: benchmarkMode ? 6000 : (convertedObject && convertedObject.simplified === true ? 6000 : (externalModel ? 11500 : 12500))
+    readonly property bool vigorScene: convertedObject !== null && convertedObject.simplified === true
+    property real homeDistance: benchmarkMode ? 6000 : (vigorScene ? 4000 : (externalModel ? 11500 : 12500))
     property bool showExtras: true
     property real modelScale: 1
     property real modelHeight: 1250
@@ -45,6 +47,8 @@ ApplicationWindow {
     property real testSpindle: convertedObject ? convertedObject.spindlePosition : -999
     property real testZ: convertedObject ? convertedObject.spindleHeight : -999
     property real testLift: convertedObject && convertedObject.liftPosition !== undefined ? convertedObject.liftPosition : 0
+    property vector3d testCarriagePosition: convertedObject ? convertedObject.carriagePose : Qt.vector3d(0,0,0)
+    property vector3d testRouterPosition: convertedObject ? convertedObject.routerPose : Qt.vector3d(0,0,0)
     function createConverted() {
         if (!convertedModel || convertedObject) return
         convertedComponent = Qt.createComponent(modelUrl, Component.PreferSynchronous)
@@ -53,19 +57,43 @@ ApplicationWindow {
             if (convertedObject) homeView()
         } else console.warn(convertedComponent.errorString())
     }
-    onModelUrlChanged: { if (convertedObject) { convertedObject.destroy(); convertedObject=null } Qt.callLater(root.createConverted) }
-    Component.onCompleted: Qt.callLater(root.createConverted)
+    function createScene() {
+        if (externalModel) {
+            if (demoObject) { demoObject.destroy(); demoObject=null }
+            createConverted()
+        } else if (!demoObject) demoObject=demoComponent.createObject(demoModel)
+    }
+    onModelUrlChanged: { if (convertedObject) { convertedObject.destroy(); convertedObject=null } Qt.callLater(root.createScene) }
+    Component.onCompleted: Qt.callLater(root.createScene)
+    Component {
+        id: demoComponent
+        Vigor { axisX: motion.x; axisY: motion.y; axisZ: motion.z; surroundings: root.showExtras }
+    }
     function homeView() {
+        navigation.flushDrag()
         orbit.position=Qt.vector3d(0,root.externalModel ? root.modelHeight/2 : 800,-150)
         orbit.eulerRotation=Qt.vector3d(-25,25,0)
         navigation.setDistance(root.homeDistance)
     }
+    function topView() {
+        navigation.flushDrag()
+        orbit.position=root.vigorScene ? Qt.vector3d((vigorProfile.length-4200)*0.27,625,-100) : Qt.vector3d(0,root.externalModel ? root.modelHeight/2 : 650,0)
+        orbit.eulerRotation=Qt.vector3d(-89.9,root.vigorScene ? -1 : -90,0)
+        navigation.setDistance(root.vigorScene ? 4000 : 8500)
+    }
+    function frontView() {
+        navigation.flushDrag()
+        orbit.position=root.vigorScene ? Qt.vector3d((vigorProfile.length-4200)*0.27,625,150) : Qt.vector3d(0,root.externalModel ? root.modelHeight/2 : 750,0)
+        orbit.eulerRotation=root.vigorScene ? Qt.vector3d(-3,-1,0) : Qt.vector3d(0,-90,0)
+        navigation.setDistance(root.vigorScene ? 4000 : 8500)
+    }
     function showPcni() { programDialog.open() }
     function showMachineData() { dataDialog.open() }
     function inspectionView() {
-        orbit.position=Qt.vector3d(540,780,0)
-        orbit.eulerRotation=Qt.vector3d(-25,25,0)
-        navigation.setDistance(2800)
+        navigation.flushDrag()
+        orbit.position=Qt.vector3d(0,760,0)
+        orbit.eulerRotation=Qt.vector3d(-30,90,0)
+        navigation.setDistance(3900)
     }
     component ActionButton: Button {
         id: control
@@ -116,27 +144,49 @@ ApplicationWindow {
         id: machineFolder
         title: "User klasörünü içeren makine data klasörünü seçin"
         onAccepted: {
-            motion.clearPath()
             let path=decodeURIComponent(selectedFolder.toString().replace(/^file:\/\/\//, ""))
-            pcni.root=path; machineData.root=path
+            vigorProfile.assignData(path)
+        }
+    }
+    Dialog {
+        id: profileDialog
+        title: "Vigor makine seçimi"
+        anchors.centerIn: parent; width: 430; modal: true
+        standardButtons: Dialog.Close
+        contentItem: ColumnLayout {
+            spacing: 12
+            Repeater {
+                model: [{id:"2142",length:4200},{id:"2136",length:3660},{id:"2128",length:2800}]
+                delegate: ActionButton {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    primary: vigorProfile.model === modelData.id
+                    text: "Vigor " + modelData.id + " · " + modelData.length + " × 2100 mm"
+                    onClicked: { vigorProfile.select(modelData.id); profileDialog.close(); root.homeView() }
+                }
+            }
+            Label { Layout.fillWidth: true; text: "Seçiminiz sonraki açılışlarda korunur."; color: "#aab9ce"; wrapMode: Text.Wrap }
+            Label { Layout.fillWidth: true; text: vigorProfile.dataAssigned ? "Bu makinenin data klasörü kayıtlı." : "Canlı izleme için bu makinenin data klasörünü seçin."; color: vigorProfile.dataAssigned ? "#9ee1b7" : "#edbe75"; wrapMode: Text.Wrap }
+            ActionButton { Layout.fillWidth: true; text: "Makine datası klasörünü seç"; onClicked: machineFolder.open() }
         }
     }
     Dialog {
         id: cniDialog
-        title: "CNI / NcOne simülatörü — canlı konum okuma"
+        title: "CNI / NcOne kontrol ünitesi — canlı konum okuma"
         anchors.centerIn: parent; width: 620; modal: true
         standardButtons: Dialog.Close
         onOpened: motion.pause()
         contentItem: ColumnLayout {
             spacing: 18
             Label { Layout.fillWidth: true; text: cni.status; wrapMode: Text.Wrap; color: cni.fresh ? "#9ee1b7" : "#edbe75" }
+            Label { Layout.fillWidth: true; visible: cni.fresh && !sceneFrame.calibrated; text: "3D modelin konumu eşleştirilemedi. Makine datasını ve kayıtlı takımları kontrol edin."; wrapMode: Text.Wrap; color: "#edbe75" }
             Label { text: "X: " + (cni.fresh ? cni.x.toFixed(3)+" mm" : "—"); font.pixelSize: 23 }
             Label { text: "Y: " + (cni.fresh ? cni.y.toFixed(3)+" mm" : "—"); font.pixelSize: 23 }
             Label { text: "Z: " + (cni.fresh ? cni.z.toFixed(3)+" mm" : "—"); font.pixelSize: 23 }
             Rectangle { Layout.fillWidth: true; height: 1; color: "#405067" }
             Label { Layout.fillWidth: true; text: cni.fresh ? "Merkez "+cni.center+" · aktif ORIG"+cni.originNumber+" · takım referansı "+cni.toolReference : "Aktif merkez/orijin bekleniyor"; color: "#82afff"; font.bold: true }
             Label { Layout.fillWidth: true; text: cni.fresh ? "Orijin ofseti  X "+cni.originX.toFixed(3)+"  Y "+cni.originY.toFixed(3)+"  Z "+cni.originZ.toFixed(3)+" mm" : ""; wrapMode: Text.Wrap }
-            Label { Layout.fillWidth: true; text: cni.fresh ? "Parça koordinatı  X "+cni.workX.toFixed(3)+"  Y "+cni.workY.toFixed(3)+"  Z "+cni.workZ.toFixed(3)+" mm" : ""; wrapMode: Text.Wrap; color: "#9ee1b7" }
+            Label { Layout.fillWidth: true; text: cni.workFresh ? "Takım / parça koordinatı  X "+cni.workX.toFixed(3)+"  Y "+cni.workY.toFixed(3)+"  Z "+cni.workZ.toFixed(3)+" mm (Z: plaka altı)" : "Takım düzeltmesi / tabla sıfırı bekleniyor"; wrapMode: Text.Wrap; color: "#9ee1b7" }
             Label { Layout.fillWidth: true; text: "3D model, Dati/datassi eksen limitlerine göre ölçeklenir. Aktif orijin CNI merkez verisinden okunur. NcOne'a komut gönderilmez."; wrapMode: Text.Wrap }
             RowLayout {
                 Button { text: "CNI verisini oku"; enabled: !cni.active; onClicked: cni.start() }
@@ -158,7 +208,7 @@ ApplicationWindow {
             StackLayout {
                 Layout.fillWidth: true; Layout.fillHeight: true; currentIndex: dataTabs.currentIndex
                 ListView {
-                    clip: true; spacing: 4; model: machineData.origins
+                    clip: true; spacing: 4; model: dataDialog.visible && dataTabs.currentIndex === 0 ? machineData.origins : []
                     delegate: Rectangle {
                         required property var modelData
                         width: ListView.view.width; height: 42; radius: 5; color: modelData.number===cni.originNumber ? "#244f8f" : modelData.disabled ? "#202833" : "#253c35"
@@ -166,7 +216,7 @@ ApplicationWindow {
                     }
                 }
                 ListView {
-                    clip: true; spacing: 4; model: machineData.magazineTools
+                    clip: true; spacing: 4; model: dataDialog.visible && dataTabs.currentIndex === 1 ? machineData.magazineTools : []
                     Label { anchors.centerIn: parent; visible: machineData.magazineTools.length===0; text: "Dati takım tablosunda magazin cebine atanmış takım yok"; color: "#edbe75" }
                     delegate: Rectangle {
                         required property var modelData
@@ -175,7 +225,7 @@ ApplicationWindow {
                     }
                 }
                 ListView {
-                    clip: true; spacing: 4; model: machineData.tools
+                    clip: true; spacing: 4; model: dataDialog.visible && dataTabs.currentIndex === 2 ? machineData.tools : []
                     delegate: Rectangle {
                         required property var modelData
                         width: ListView.view.width; height: 42; radius: 5; color: "#253247"
@@ -188,11 +238,11 @@ ApplicationWindow {
     }
     Dialog {
         id: programDialog
-        title: "PCNI programları ve etiketler — çevrimdışı X/Y önizleme"
+        title: "PCNI programları ve etiketler — malzeme işleme önizlemesi"
         width: Math.min(root.width-50,1040); height: Math.min(root.height-50,760)
         anchors.centerIn: parent; modal: true
         standardButtons: Dialog.Close
-        onOpened: motion.pause()
+        onOpened: { motion.pause(); pathCanvas.requestPaint() }
         contentItem: ColumnLayout {
             RowLayout {
                 Layout.fillWidth: true
@@ -211,27 +261,28 @@ ApplicationWindow {
                         id: pathCanvas; anchors.fill: parent; anchors.margins: 15
                         onWidthChanged: requestPaint()
                         onHeightChanged: requestPaint()
-                        Connections { target: pcni; function onChanged() { pathCanvas.requestPaint() } }
+                        Connections { target: pcni; enabled: programDialog.visible; function onChanged() { pathCanvas.requestPaint() } }
                         onPaint: {
+                            if (!programDialog.visible) return
                             let c=getContext("2d"); c.clearRect(0,0,width,height)
                             if(pcni.width<=0 || pcni.height<=0) return
                             let scale=Math.min((width-20)/pcni.width,(height-20)/pcni.height)
-                            let ox=10, oy=height-10
-                            c.fillStyle="#dac59e"; c.fillRect(ox,oy-pcni.height*scale,pcni.width*scale,pcni.height*scale)
+                            let ox=10, oy=10
+                            c.fillStyle="#dac59e"; c.fillRect(ox,oy,pcni.width*scale,pcni.height*scale)
                             let pts=pcni.points
                             for(let i=1;i<pts.length;i++) {
                                 c.beginPath(); c.strokeStyle=pts[i].travel?"#a5abb1":"#245ee8"; c.lineWidth=pts[i].travel?0.7:1.5
-                                c.moveTo(ox+pts[i-1].x*scale,oy-pts[i-1].y*scale)
-                                c.lineTo(ox+pts[i].x*scale,oy-pts[i].y*scale); c.stroke()
+                                c.moveTo(ox+pts[i-1].x*scale,oy+pts[i-1].y*scale)
+                                c.lineTo(ox+pts[i].x*scale,oy+pts[i].y*scale); c.stroke()
                             }
                             c.font="12px sans-serif"; c.fillStyle="#80330f"
-                            for(let tag of pcni.labels) c.fillText(String(tag.index),ox+tag.x*scale,oy-tag.y*scale)
+                            for(let tag of pcni.labels) c.fillText(String(tag.index),ox+tag.x*scale,oy+tag.y*scale)
                         }
                     }
                 }
                 ListView {
                     id: labelList; Layout.preferredWidth: 250; Layout.fillHeight: true; clip: true
-                    spacing: 8; model: pcni.labels
+                    spacing: 8; model: programDialog.visible ? pcni.labels : []
                     delegate: Column {
                         required property var modelData
                         width: 235; spacing: 4
@@ -241,12 +292,11 @@ ApplicationWindow {
                     }
                 }
             }
-            Label { Layout.fillWidth: true; text: "Mavi: kesim yolu · Gri: geçiş · Numaralar: etiket konumları\nTablada kesim düz freze ve sabit derinlik kullanır; CNI Z çevrimleri uygulanmaz."; wrapMode: Text.Wrap }
+            Label { Layout.fillWidth: true; text: "Mavi: kesim yolu · Gri: geçiş · Numaralar: etiket konumları\nPRF / Z / ZI derinlikleri ve takım kütüphanesindeki çaplar uygulanır."; wrapMode: Text.Wrap }
             Button {
                 text: "Plakayı makine tablasına yükle"; enabled: pcni.ready && pcni.thickness>0
                 onClicked: {
-                    if(motion.loadPath(pcni.points)) {
-                        stock.configure(pcni.width,pcni.height,pcni.thickness,pcni.toolDiameter)
+                    if(machining.load()) {
                         root.homeView();programDialog.close()
                     }
                 }
@@ -260,19 +310,29 @@ ApplicationWindow {
             color: "#1b2430"
             RowLayout {
                 anchors.fill: parent; anchors.leftMargin: 28; anchors.rightMargin: 28; spacing: 22
-                Rectangle { width: 5; height: 35; radius: 2; color: "#f47927" }
-                ColumnLayout {
-                    spacing: 0
-                    Label { text: "POYRAZ"; color: "#eef4fb"; font.pixelSize: 28; font.bold: true; font.letterSpacing: 3 }
-                    Label { text: "MAKİNA  /  SOLIDSIM NATIVE"; color: "#aab9ce"; font.pixelSize: 10; font.letterSpacing: 1.5 }
-                }
-                Rectangle { width: 1; height: 34; color: "#344154" }
-                ColumnLayout {
-                    spacing: 3
-                    Label { text: "VIGOR 2136"; color: "#e5edf7"; font.bold: true; font.pixelSize: 17 }
-                    Label { text: "3D makine ve eksen hareketi prototipi"; color: "#aab9ce"; font.pixelSize: 12 }
+                RowLayout {
+                    spacing: 14
+                    Item {
+                        Layout.preferredWidth: 36; Layout.preferredHeight: 34
+                        // Match the supplied PM mark, including the gaps between its strokes.
+                        Item {
+                            y: 1; width: 28; height: 25
+                            scale: 1.25; transformOrigin: Item.TopLeft
+                            Rectangle { x: 0; y: 0; width: 2; height: 25; color: "#eef4fb" }
+                            Rectangle { x: 0; y: 0; width: 13; height: 2; color: "#eef4fb" }
+                            Rectangle { x: 11; y: 0; width: 2; height: 14; color: "#eef4fb" }
+                            Rectangle { x: 4; y: 12; width: 9; height: 2; color: "#eef4fb" }
+                            Rectangle { x: 15; y: 0; width: 12; height: 14; color: "#008bd2" }
+                            Rectangle { x: 4; y: 16; width: 24; height: 2; color: "#eef4fb" }
+                            Rectangle { x: 4; y: 16; width: 2; height: 9; color: "#eef4fb" }
+                            Rectangle { x: 15; y: 16; width: 2; height: 9; color: "#eef4fb" }
+                            Rectangle { x: 26; y: 16; width: 2; height: 9; color: "#eef4fb" }
+                        }
+                    }
+                    Label { text: "Vigor"; color: "#eef4fb"; font.pixelSize: 26; font.bold: true }
                 }
                 Item { Layout.fillWidth: true }
+                ActionButton { text: "Vigor " + vigorProfile.model + " ▾"; onClicked: profileDialog.open() }
                 Rectangle {
                     implicitWidth: 210; implicitHeight: 33; radius: 16; color: "#253c35"
                     Label { anchors.centerIn: parent; text: root.externalModel ? (root.motionBound ? "VIGOR · SİMÜLASYON" : "VIGOR · GERÇEK MODEL") : "DEMO · MAKİNE BAĞLI DEĞİL"; color: root.externalModel ? "#9ee1b7" : "#edbe75"; font.bold: true; font.pixelSize: 11 }
@@ -284,23 +344,22 @@ ApplicationWindow {
             Layout.margins: 18; spacing: 16
             Rectangle {
                 Layout.fillWidth: true; Layout.fillHeight: true
-                color: "#191d22"; radius: 12; clip: true
+                color: "#323232"; radius: 12; clip: true
                 View3D {
                     id: view
                     objectName: "machineViewport"
                     anchors.fill: parent
+                    // Always render at the viewport's native pixel resolution.
+                    // Never trade model clarity for performance on controllers.
                     camera: camera
                     environment: SceneEnvironment {
-                        clearColor: "#202833"
+                        clearColor: "#323232"
                         backgroundMode: SceneEnvironment.Color
-                        antialiasingMode: SceneEnvironment.MSAA
                         // Controller profile: VirtualBox WDDM, 0 MB dedicated
-                        // VRAM and 4 GB system RAM. Keep 2x MSAA only.
-                        antialiasingQuality: SceneEnvironment.Low
+                        // VRAM and 4 GB system RAM. Avoid multisample buffers.
+                        antialiasingMode: SceneEnvironment.NoAA
                     }
-                    DirectionalLight { eulerRotation: Qt.vector3d(-45,-35,0); brightness: 1.0; ambientColor: "#777777" }
-                    DirectionalLight { eulerRotation: Qt.vector3d(-30,140,0); brightness: 0.5; ambientColor: "#202020" }
-                    DirectionalLight { eulerRotation: Qt.vector3d(35,25,0); brightness: 0.25; ambientColor: "#202020" }
+                    DirectionalLight { eulerRotation: Qt.vector3d(-45,-35,0); brightness: 1.15; ambientColor: "#999999" }
                     Node {
                         id: orbit
                         position: Qt.vector3d(0,800,-150)
@@ -314,20 +373,34 @@ ApplicationWindow {
                         scale: Qt.vector3d(110,0.5,130)
                         materials: PrincipledMaterial { baseColor: "#dbe3eb"; roughness: 1; lighting: PrincipledMaterial.NoLighting }
                     }
-                    Vigor { visible: !root.externalModel; axisX: motion.x; axisY: motion.y; axisZ: motion.z; surroundings: root.showExtras }
+                    // Instantiate the demonstration only when no CAD is loaded.
+                    // Invisible demo objects otherwise retain bindings and buffers.
+                    Node { id: demoModel }
                     Node {
                         id: machineModel
                         objectName: "machineModel"
                         scale: root.convertedModel ? Qt.vector3d(540,540,540) : Qt.vector3d(root.modelScale,root.modelScale,root.modelScale)
                         Node {
-                            visible: motion.programMode && root.convertedModel
+                            visible: machining.visible && root.convertedModel
                             // Model coordinates are metres; stock mesh coordinates are mm.
-                            position: Qt.vector3d(-0.3099066,1.0825051,-1.2046434)
+                            position: Qt.vector3d(machining.stockX,machining.stockY,machining.stockZ)
                             scale: Qt.vector3d(0.001,0.001,0.001)
                             Model {
                                 objectName: "stockOnTable"
                                 geometry: stock
                                 materials: PrincipledMaterial { baseColor: "white"; vertexColorsEnabled: true; roughness: 0.9; cullMode: Material.NoCulling }
+                            }
+                        }
+                        Repeater3D {
+                            model: root.convertedObject && root.convertedObject.drillRigVersion === 1 ? [] : machining.liveJob ? (machining.drilling ? machining.activeDrills : []) : (motion.programMode && motion.toolKind === "drill" ? motion.activeDrills : [])
+                            delegate: Model {
+                                required property var modelData
+                                source: "#Cylinder"
+                                position: Qt.vector3d(machining.stockX+((machining.liveJob ? machining.workX : motion.x)+modelData.dx)/1000,
+                                    machining.stockY+(stock.thickness-machining.depth+15)/1000,
+                                    machining.stockZ+((machining.liveJob ? machining.workY : motion.y)+modelData.dy)/1000)
+                                scale: Qt.vector3d(modelData.diameter/100000,0.0003,modelData.diameter/100000)
+                                materials: PrincipledMaterial { baseColor: "#c4c8cc"; roughness: 0.5 }
                             }
                         }
                         RuntimeLoader {
@@ -349,12 +422,12 @@ ApplicationWindow {
                         }
 
                     }
-                    CameraNavigation { id: navigation; objectName: "cameraNavigation"; anchors.fill: parent; origin: orbit; camera: camera }
-                }
-                Column {
-                    anchors.left: parent.left; anchors.top: parent.top; anchors.margins: 22; spacing: 7
-                    Label { text: "VIGOR 2136 / TABLADA İŞLEME"; color: "#e5edf7"; font.pixelSize: 14; font.bold: true; font.letterSpacing: 1 }
-                    Label { text: motion.programMode ? stock.stockWidth+" × "+stock.stockHeight+" × "+stock.thickness+" mm · 2 mm hücre" : "3660 × 2100 × 120 mm · sade görünüm"; color: "#b6c4d6"; font.pixelSize: 12 }
+                    CameraNavigation {
+                        id: navigation; objectName: "cameraNavigation"
+                        anchors.fill: parent; origin: orbit; camera: camera
+                        minimumDistance: root.vigorScene ? 1500 : 1200
+                        maximumDistance: root.vigorScene ? 6000 : 10000
+                    }
                 }
                 Rectangle {
                     anchors.right: parent.right; anchors.top: parent.top; anchors.margins: 18
@@ -369,11 +442,18 @@ ApplicationWindow {
                     width: Math.min(parent.width-60,480); height: errorLabel.implicitHeight+40; radius: 10; color: "#482b2b"
                     Label { id: errorLabel; anchors.centerIn: parent; width: parent.width-40; wrapMode: Text.Wrap; text: "Model yüklenemedi.\n" + (root.convertedModel && root.convertedComponent ? root.convertedComponent.errorString() : loader.errorString); color: "#ffb09e" }
                 }
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter; anchors.top: parent.top; anchors.topMargin: 82
+                    visible: machining.error
+                    width: Math.min(parent.width-50,600); height: toolError.implicitHeight+30
+                    radius: 8; color: "#482b2b"
+                    Label { id: toolError; anchors.centerIn: parent; width: parent.width-30; wrapMode: Text.Wrap; color: "#ffb09e"; text: machining.status }
+                }
                 RowLayout {
                     anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right; anchors.margins: 18
                     ActionButton { text: "İzometrik"; onClicked: root.homeView() }
-                    ActionButton { text: "Üst"; onClicked: { orbit.position=Qt.vector3d(0,root.externalModel ? root.modelHeight/2 : 650,0); orbit.eulerRotation=Qt.vector3d(-89.9,-90,0); navigation.setDistance(8500) } }
-                    ActionButton { text: "Ön"; onClicked: { orbit.position=Qt.vector3d(0,root.externalModel ? root.modelHeight/2 : 750,0); orbit.eulerRotation=Qt.vector3d(0,-90,0); navigation.setDistance(8500) } }
+                    ActionButton { text: "Üst"; onClicked: root.topView() }
+                    ActionButton { text: "Ön"; onClicked: root.frontView() }
                     Item { Layout.fillWidth: true }
                     Label { text: "Sürükle: döndür\nTekerlek: yakınlaştır"; color: "#9aacc0"; font.pixelSize: 11 }
                 }
@@ -381,13 +461,18 @@ ApplicationWindow {
             Rectangle {
                 Layout.preferredWidth: 310; Layout.fillHeight: true
                 color: "#1b2430"; radius: 12
-                ColumnLayout {
-                    anchors.fill: parent; anchors.margins: 18; spacing: 8
+                ScrollView {
+                    id: sideScroll
+                    anchors.fill: parent; anchors.margins: 18; clip: true
+                    ColumnLayout {
+                    width: sideScroll.availableWidth
+                    height: Math.max(implicitHeight,sideScroll.availableHeight)
+                    spacing: 8
                     Label { text: "EKSENLER"; color: "#e5edf7"; font.pixelSize: 15; font.bold: true; font.letterSpacing: 1 }
                     Label { Layout.fillWidth: true; text: motion.liveMode ? "CNI canlı izleme · salt okunur" : root.externalModel ? (root.motionBound ? "Ana makine · X/Y/Z hareket simülasyonu." : "Gerçek Vigor modeli yüklendi; eksen eşlemesi bekleniyor.") : "Sürgüleri hareket ettirin veya otomatik demoyu başlatın."; wrapMode: Text.Wrap; color: motion.liveMode ? "#9ee1b7" : "#aab9ce"; font.pixelSize: 12 }
                     ColumnLayout {
                         Layout.fillWidth: true; spacing: 8; enabled: !motion.programMode && !motion.liveMode; opacity: 1
-                        AxisControl { Layout.fillWidth: true; axisName: "X"; axisIndex: 0; limit: 3660; currentValue: motion.liveMode ? cni.x : motion.x }
+                        AxisControl { Layout.fillWidth: true; axisName: "X"; axisIndex: 0; limit: vigorProfile.length; currentValue: motion.x }
                         AxisControl { Layout.fillWidth: true; axisName: "Y"; axisIndex: 1; limit: 2100; currentValue: motion.liveMode ? cni.y : motion.y }
                         AxisControl { Layout.fillWidth: true; visible: !motion.programMode; axisName: "Z"; axisIndex: 2; limit: 120; currentValue: motion.liveMode ? cni.z : motion.z }
                     }
@@ -398,44 +483,27 @@ ApplicationWindow {
                         Item { Layout.fillWidth: true }
                         Label { text: motion.speed.toFixed(2)+"×"; color: "#82afff"; font.bold: true }
                     }
-                    Slider { Layout.fillWidth: true; from: 0.25; to: 3; value: motion.speed; onMoved: motion.speed=value; enabled: !motion.liveMode }
+                    Slider { Layout.fillWidth: true; from: 0.25; to: 10; value: motion.speed; onMoved: motion.speed=value; enabled: !motion.liveMode }
                     RowLayout {
                         Layout.fillWidth: true
-                        ActionButton { Layout.fillWidth: true; primary: true; enabled: !motion.liveMode; text: motion.liveMode ? "CNI canlı izleme" : motion.running ? "Hareketi duraklat" : "Hareketi başlat"; onClicked: motion.running?motion.pause():motion.play() }
+                        ActionButton { Layout.fillWidth: true; primary: true; enabled: !motion.liveMode; text: motion.liveMode ? "CNI canlı izleme" : motion.running ? "Duraklat" : motion.programMode ? "İşlemeyi başlat" : "Hareketi başlat"; onClicked: motion.running?motion.pause():motion.play() }
                         ActionButton { text: "Sıfırla"; enabled: !motion.liveMode; onClicked: motion.reset() }
                     }
 
-                    Label { Layout.fillWidth: true; visible: motion.programMode; text: pcni.name + "\nSabit derinlikli malzeme simülasyonu"; wrapMode: Text.Wrap; color: "#edbe75" }
-                    RowLayout {
-                        visible: motion.programMode
-                        Label { text: "Takım çapı (mm)" }
-                        SpinBox { from: 4; to: 50; value: stock.diameter; enabled: !motion.running; onValueModified: {motion.reset();stock.diameter=value} }
-                    }
-                    RowLayout {
-                        visible: motion.programMode
-                        Label { text: "Kesim derinliği" }
-                        SpinBox { from: 0; to: stock.thickness; value: stock.depth; enabled: !motion.running; onValueModified: {motion.reset();stock.depth=value} }
-                    }
-                    Label { visible: motion.programMode; text: "Kaldırılan: "+stock.removed.toFixed(1)+" cm³"; color: "#245ee8" }
+                    Label { Layout.fillWidth: true; visible: machining.visible || motion.liveMode || machining.error; text: pcni.name + "\n" + machining.status; wrapMode: Text.Wrap; color: machining.error ? "#ff847e" : "#edbe75" }
+                    Label { visible: machining.visible; text: machining.tool; color: "#b6c4d6" }
+                    Label { visible: machining.visible; text: machining.depth < 0 ? "Plakanın üzerinde: "+(-machining.depth).toFixed(2)+" mm" : "Derinlik: "+machining.depth.toFixed(2)+" mm"; color: "#b6c4d6" }
+                    Label { visible: machining.visible; text: "Kaldırılan: "+stock.removed.toFixed(1)+" cm³"; color: "#82afff" }
                     ActionButton { Layout.fillWidth: true; text: "PCNI programları / etiketler"; onClicked: programDialog.open() }
                     ActionButton { Layout.fillWidth: true; visible: motion.programMode; text: "PCNI önizlemeyi kapat"; onClicked: {motion.clearPath()} }
                     Item { Layout.fillHeight: true }
-                    ActionButton { Layout.fillWidth: true; text: "CNI simülatörüne bağlan"; onClicked: cniDialog.open() }
+                    ActionButton { Layout.fillWidth: true; text: "CNI bağlantısı"; onClicked: cniDialog.open() }
                     ActionButton { Layout.fillWidth: true; text: "Makine datası / takımlar"; onClicked: dataDialog.open() }
                     ActionButton { Layout.fillWidth: true; text: "3D model aç…"; onClicked: modelDialog.open() }
                     ActionButton { Layout.fillWidth: true; visible: false; text: "Temsili modele dön"; onClicked: { root.modelUrl=""; motion.reset(); root.homeView() } }
                     Label { Layout.fillWidth: true; visible: !root.externalModel; text: "GLB / glTF / OBJ\nVigor görselleri esas alındı; CAD modeli değildir."; color: "#8695a6"; font.pixelSize: 11; wrapMode: Text.Wrap }
+                    }
                 }
-            }
-        }
-        Rectangle {
-            Layout.fillWidth: true; Layout.preferredHeight: 34; color: "#17324f"
-            RowLayout {
-                anchors.fill: parent; anchors.leftMargin: 24; anchors.rightMargin: 24
-                Label { text: "●  YEREL MASAÜSTÜ"; color: "#99d9c0"; font.pixelSize: 10; font.bold: true }
-                Label { text: "   C++ / Qt Quick 3D"; color: "#a8bcd1"; font.pixelSize: 10 }
-                Item { Layout.fillWidth: true }
-                Label { text: "Çevrimdışı simülasyon · Düz freze / sabit derinlik · Makine bağlı değil"; color: "#d0dbe7"; font.pixelSize: 10 }
             }
         }
     }

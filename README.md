@@ -1,52 +1,144 @@
-# SolidSim Native — Vigor 2136
+# SolidSim Native — Vigor 2142 / 2136 / 2128
 
 Windows masaüstü simülasyonu. C++ ve Qt Quick 3D ile çalışır; tarayıcı gerekmez.
 
-## Çalıştırma
+## Vigor ölçüsü seçimi
 
-`Baslat.cmd` dosyasını çalıştırın. `app` ve `assets` klasörlerini birlikte tutun.
+Üstteki Vigor menüsünden 2142 (4200 × 2100), 2136 (3660 × 2100) veya
+2128 (2800 × 2100 mm) seçilir. Seçim `vigor-settings.ini` dosyasında korunur.
+Şase ve tabla uzunluğu değişir; kafa, köprü, pano ve sabit plaka köşesi korunur.
+Yalnızca seçili şasenin ağı belleğe yüklenir. Dişli raylar boyuna sıkıştırılmaz;
+gereken uzunlukta bırakılır. Seçilen boyu aşan PCNI plaka/yol koordinatları reddedilir.
 
-## NcOne / CNI canlı eksen bağlantısı
+Makine değişimi canlı okumayı ve önceki önizlemeyi kapatır. Her seçeneğin data
+klasörü ayrı kaydedilir; yeni seçenek için kendi Dati/User klasörünü içeren
+makine klasörünü seçmeden CNI canlı bağlantısı başlatılmaz. Mevcut kurulumun
+data klasörü ilk 2142 seçeneğinde korunmuştur. CNI eksen referansları, orijinler
+ve takımlar seçili data klasöründen okunur; CNC/PLC dosyaları değiştirilmez.
 
-Önce NcOne veya SimPoyraz'ı açın. SolidSim Native içinde `CNI simülatörüne bağlan` düğmesine basıp `CNI verisini oku` seçin. Pencereyi kapatsanız da bağlantı devam eder; bağlantıyı durdurmak için aynı penceredeki `Bağlantıyı kes` düğmesini kullanın.
+Doğrulama: 32 profil/sınır/kalıcılık kontrolü, 42 işleme kontrolü ve mevcut
+1085 stok yüzeyi karşılaştırması geçti. 12 sabit sıfır noktası/sahne kontrolü
+art arda üç çalıştırmada geçti. Üç ölçünün sahne görüntüleri, menüden geçiş
+ve yeniden açılışta seçimin korunması ayrıca kontrol edildi.
+Gerçek kontrol bilgisayarındaki akıcılık ayrıca ölçülmelidir.
 
-Uygulama `SharedAx` üzerinden ilk üç kartezyen eksenin gerçek konumunu 100 ms aralıkla **salt okunur** alır. CNC, PLC veya eksenlere komut göndermez. Canlı mod açıkken elle eksen, demo ve sıfırlama kontrolleri kilitlenir. Test: NcOne çalışırken `app/SolidSimNative.exe --cni-probe` sıfır koduyla bitmelidir.
+## İlk çalıştırma
 
-Görüntü eşlemesi, mevcut Vigor makine datasındaki limitleri (X -34…5235, Y -240…2310, Z -295…46) modelin görsel hareket aralığına ölçekler. Ham değerlerin doğru okunduğu simülatörle doğrulandı. Fiziksel makinede yön, sıfır noktası ve strok eşlemesi kuru çalıştırmada ayrıca doğrulanmalıdır.
+ZIP dosyasını tamamen çıkartın ve `app` ile `assets` klasörlerini birlikte tutun.
+Kontrol bilgisayarında önce `Kontrol-Testi.cmd` çalıştırın. Test makineye veya CNC'ye
+komut göndermez. Program mantığını, PRF/Z/ZI derinliklerini, matkap çevrimlerini,
+tanımsız takım hatasını, kısmi/tam derinlik kesim yüzeylerini ve tam boy
+plakanın güncelleme maliyetini denetler. Ardından Direct3D ve OpenGL ile hareketi
+ve kesim sırasında hareketi ayrı ayrı ölçer. Her ölçüm 3 saniye hazırlık ve
+10 saniye kayıt içerir. Her iki yükte yeterli çalışan sürücüler arasında hız farkı %5'ten
+azsa kare süreleri daha dengeli olanı seçer. Seçimi `render-backend.txt` dosyasına
+kaydeder ve `Baslat.cmd` sonraki açılışlarda onu otomatik kullanır. Sonuç `UYUMLU`
+olursa programı açın.
 
-Canlı bağlantı ayrıca CNI merkezinden aktif orijin numarası ile ORX/ORY/ORZ ofsetlerini okur. Ekranda ham makine koordinatı, aktif orijin ofseti ve bunların farkı olan parça koordinatı ayrı gösterilir. Böylece mekanik makine sıfırı ile program/parça sıfırı birbirine karıştırılmaz.
+## CNI canlı izleme ve program Start
 
-`Makine datası / takımlar` ekranı `Dati/datassi_01_dat.ini`, `datvari_dat.ini`, `fametec_dat.ini`, `datpunt_dat.ini` ve `datmag_01_dat.ini` dosyalarını salt okunur açar. Mekanik eksen sıfırları ve limitler, ORIG tabloları, yapılandırılmış ön/arka orijin numaraları, takım çapı/boyu ve `PMAG` ile atanmış magazin cepleri gösterilir. NcOne takım sayfasında bir takımın magazin ataması değiştiğinde `Dati'yi yenile` ile tekrar okunur.
+CNI kuruluysa uygulama normal açılışta otomatik olarak salt okunur bağlanır.
+NcOne Start durumunda çalışan PCNI dosyasını okur; LX, LY ve LZ ölçülerinden
+plakayı oluşturur. Program adı, Start durumu, eksenler, aktif iş sıfırı ve takım
+referansı CNI servislerinden okunur. Uygulama CNC veya PLC'ye komut göndermez.
+Bağlantıyı kapatmak için CNI bağlantı penceresindeki durdurma düğmesini kullanın.
 
-## PCNI ve etiket önizlemesi
+Canlı Y=0 makine kenar sıfırıdır; 1050 mm eklenmez. İşleme sırasında plaka,
+CNI'den okunan aktif iş sıfırı CAD tablasının plaka köşesine eşlenerek yerleştirilir.
+Takım ucu için aktif toplam eksen düzeltmesi ve PRIMO'nun GENERAL/CSag alt tabla payı
+canlı okunur. Bu bilgiler alınamazsa malzeme hesabı bekler. Ölçülen yol programla eşleşmezse
+malzeme kaldırılmaz ve eşleşme bekleniyor mesajı gösterilir. Veri kesildiğinde
+malzeme hesabı durur. Uygulama fiziksel makineyi durdurmaz.
 
-`PCNI programları / etiketler` düğmesiyle makine datasındaki `User/Prog/*.pcni` dosyalarını seçin. `Programı oku` plaka üzerindeki X/Y yolunu ve etiket konumlarını gösterir. Etiketler `User/Import/<program>_<numara>.bmp` (veya png/jpg) adından eşleştirilir. Başka bilgisayarda `Klasör seç` ile `User` klasörünün üstündeki makine data klasörünü seçin; üretim dosyaları bu repoya kopyalanmaz.
+Havada geçen takım, sonraki bir rampanın XY izdüşümünden geçse bile kesim
+sırasını ilerletmez. Önce doğrulanmış matkap geri çekilmesi tamamlanır;
+malzeme üstündeki ölçülmüş derinlikte yol araması yapılmaz. Bu, sonraki
+kanalların ve son ebatlamanın atlanmasını önler. Delikli_S01'in 7018 örnekli
+tam çevrim kaydıyla 255 delik ve son konturlar tekrar doğrulandı; farklı
+örnekleme zamanlarını temsil eden üç ara kayıt da kesimleri korudu.
 
-`Plakayı makine tablasına yükle` plaka boyutlarını LX/LY/LZ'den yükler ve plakayı mevcut Vigor tablasına yerleştirir. Takım çapı DIAMETER açıklamasından alınır (bulunmazsa 8 mm); çapı ve kesim derinliğini panelden kontrol edip `Hareketi başlat` seçin. Başlangıç derinliği plaka kalınlığıdır. Derinliği azaltarak kısmi kanallar açabilirsiniz. Ayar değiştirme veya sıfırlama malzemeyi yeniler; duraklatıp devam etmek kaldırılan malzemeyi korur.
+## PCNI malzeme işleme
 
-Makine tablasındaki malzeme, 2 mm hücrelerle düz frezenin süpürdüğü hacmi kaldıran 2.5D bir modeldir. Tam kesim boşlukları, kanal tabanları, yan duvarlar ve yaklaşık kaldırılan hacim gösterilir. PON ile başlayan yeni kontura geçişlerde kesim yapılmaz. Takım çapı ve derinlik bu sürümde program boyunca sabittir; negatif PRF, ZI rampaları, otomatik takım değişimi, telafi ve gerçek işlem süreleri yorumlanmaz. Derinlik **makineden doğrulanmış bir değer değildir**, kullanıcı ayarıdır. Plaka, kesim izi ve freze ucu aynı model koordinatlarına bağlıdır. Freze yüksekliği, seçilen sabit derinliğe ve kesim/geçiş durumuna göre değişir. Bu geometrik hizalama CAD üzerindedir; gerçek makine sıfır kalibrasyonu değildir. Çarpışma kontrolü veya fiziksel makine komutu içermez.
+PCNI programları / etiketler ekranından programı okuyup plakayı yükleyin.
+Bu ekranın 2D plaka görünümünde X sağa, Y aşağı doğru artar; etiketler ve kesim
+yolu aynı yönü kullanır. Bu görünüm ayarı makinenin 3D eksenlerini değiştirmez.
+İşlemeyi başlat düğmesi çevrimdışı önizlemeyi oynatır. Freze girişleri PON,
+çıkışları PUP/POFF, doğrusal ilerleme G1 ve hızlı geçiş G0 olarak uygulanır.
+PRF plaka üstünden aşağı pozitif derinliktir; negatif PRF havadadır. ZI mevcut
+derinliği artırır/azaltır; mutlak Z için derinlik LZ+Z'dir. Bu nedenle PRF=-10,
+ardından ZI=28, 18 mm plakada tam derinliğe giriş verir. QVF/QVD/F ilerlemeleri
+m/dak biriminden okunur; hız sürgüsü yalnızca önizleme hızını değiştirir.
 
-Malzeme testleri: `app/SolidSimNative.exe --stock-test` (boş geçiş, kısmi kanal, tam kesim, aynı yerden tekrar geçiş ve sıfırlama).
+Dikey G99 delikleri FAM grubuyla, T seçimi, takım çapı ve PRF derinliğiyle
+oluşturulur. Çoklu T seçiminin delikleri datmand_01_dat.ini ofsetlerine göre
+hesaplanır. Takım adları/çapları datpunt_dat.ini'den; matkap eşlemesi
+protmand_dat.ini ve datconf_01_dat.ini'den okunur. Programdaki çap açıklaması
+takımı kütüphaneye kaydetmez. Tanımsız takım varsa Start sonrası simülasyon
+sayfasında örneğin “6MMZ3 takımı takım kütüphanesinde tanımlı değil” hatası
+çıkar ve o programda malzeme işleme başlamaz. CNI takım kütüphanesi değiştirilmez.
 
-Test: `app/SolidSimNative.exe --pcni-test` mevcut klasördeki programları denetler; `--machine-data <klasör>` ile farklı makine datası verilebilir. Ayrıştırıcı hata testleri `source/tools/test_pcni.ps1` içindedir.
+Malzeme hesabı 2 mm hücreli, dikey freze/delik için 2,5 boyutlu geometrik
+önizlemedir. Kör delik, tam geçiş, değişken derinlik ve rampalar hesaplanır.
+CAD modelinin görünür şekli ve ekran çözünürlüğü korunur. Arcs G2/G3, yatay/açılı
+delik, özel makrolar, takım yarıçap telafisi, kesme fiziği ve çarpışma doğrulaması
+bu sürümde uygulanmaz; desteklenmeyen komut veya sayısal ifade açık hata verir.
+Bu görünüm bir üretim veya çarpışma onayı değildir.
 
-## İçerik
+## Donanım profili
 
-- Vigor 2136 katalog renkleriyle sadeleştirilmiş 3D model
-- X/Y/Z eksen simülasyonu ve kamera kontrolü
-- Asansör, yükleme konveyörü, tel çit ve havada kalan çevre parçaları sade görünümden çıkarılmıştır
-- Tam model ve orijinal GLB `assets` klasöründe korunur
-- Ayrıntılı kullanım ve yeniden üretim bilgisi için [OKU.md](OKU.md)
+Sahne kontrol bilgisayarı için sadeleştirilmiştir. Gölgeler, parçacık efektleri ve
+çoklu örneklemeli kenar yumuşatma kapalıdır. CAD parçaları az sayıda çizim grubuna
+birleştirilmiş, küçük yüzey ayrıntıları azaltılmıştır. Tabla, köprü, kapaklar,
+freze-matkap grubu ve eksen hareketleri korunur. Pencere küçültülünce simülasyon
+duraklar. Gerçek bilgisayardaki karar `Kontrol-Testi-Sonucu.txt` içindeki hareket ve
+kesim sonuçlarına göre verilmelidir. `UYUMLU` için iki yükte de en az 24 FPS,
+en fazla 75 ms p95 kare süresi ve 100 ms üzerindeki karelerin en fazla %2 olması
+gerekir. `SINIRDA` veya `YETERSIZ` sonucu akıcılık hedefinin karşılanmadığını belirtir.
+Yerel bilgisayarın sonucu kontrol ünitesinin sonucunun yerine geçmez.
 
-## GitHub Desktop
+Kesim hesabındaki 2 mm hücreler korunur. Aynı yükseklikteki hücreler tam olarak
+aynı yüzeyi veren düz dikdörtgenlere birleştirilir. Kesimde yalnızca değişen
+64 × 64 hücrelik bölgelerin geometrisi yeniden hesaplanır; diğer bölgeler
+önbellekten alınır. CAD sahnesi açıkken kullanılmayan demo sahnesi oluşturulmaz.
+Eksen ve durum bildirimleri yalnızca ilgili değer değiştiğinde gönderilir; sabit
+değerler için sahne ve arayüz yeniden değerlendirilmez. Uzun çapraz kesimlerde
+yalnızca takımın ulaşabileceği hücreler kontrol edilir; kesim kararı ve 2 mm
+hassasiyet aynıdır. Geometri güncellemelerinde sabit vertex düzeni korunur.
+Kapalı tabla içinde kalan destek ve bağlantı parçaları temizlenmiştir. Görünen
+parçaların dış şekli, renkleri, yüzey normalleri ve görüntü çözünürlüğü korunur.
 
-Bu klasör Git deposu olarak hazırlanmıştır. Büyük GLB, MESH, DLL, EXE ve PNG dosyaları Git LFS ile izlenir.
+Kontrol bilgisayarı profilinde bütün kablo taşıma zincirleri, esnek toz emiş
+hortumları ve Clamp sistemi modelden çıkarılmıştır. Bunlar yalnızca görsel CAD
+parçalarıdır; eksen konumu veya PCNI kesim hesabında kullanılmaz. Kablo
+kanallarının yanındaki açık siyah elektrik panosu, aynı dış ölçülerde kapalı beyaz
+bir kutu olarak yenilenmiştir ve X/Y kafa hareketini birlikte izler. Spindle motoru
+HSD ES929-A görünümüne uygun alüminyum-gümüş renkte; FAM matkap grubu ise beyaz
+kapak, alüminyum gövde, gri kılavuz/pnömatik elemanlar ve siyah matkap uçlarıyla
+renklendirilmiştir. Kapalı tabla altında dışarıdan
+görünmeyen iç şase yüzleri azaltılmış; dış kapaklar, çevre profilleri ve ayaklar
+korunmuştur. Alt şasedeki üç ayrıntılı vakum giriş bileziği kaldırılmış ve çıkış
+yüzeyi çerçeve arkasına bindirilen sabit, düz ve şase rengindeki bir gövde
+kapağıyla tamamen kapatılmıştır.
+Pano ve kafa bölgesinde pano, servo motorlar ve freze/matkap kafa gövdesi
+dışındaki kablo kanalı yan plakaları, pimler, borular ve bağlantı kalıntıları da
+modelden temizlenmiştir.
+Köprünün ön ve arka ucundaki iki Yaskawa servo motor gövdesi kontrol bilgisayarı
+profilinden çıkarılmıştır; Z ekseni kaideleri, bağlantı plakaları, spindle ve FAM
+kafa motorları korunmuştur.
 
+Start sırasında CAD modeli makine koordinatından parça koordinatına geçmez.
+Görsel makine referansı başlangıçta kayıtlı ORIG_SX, T1 ve TP1 kurulum verilerinden
+oluşturulur; canlı model yalnızca ölçülen fiziksel X/Y/Z hareketini izler.
+Start, Stop, iş sıfırı değişimi ve plaka ölçüsü değişimi makineyi yerinden oynatmaz.
+Veri kesilirse son fiziksel konum korunur. Çevrimdışı Sıfırla işleminde Y=0 olur.
+Plakanın X/Y sıfırı her ölçüde giriş tablasının aynı köşesindedir
+(CAD X=-1.017 m, Z=-1.2046434 m); boyut değişince yalnızca karşı kenarlar büyür.
+Kurulum verileri uygulama açılışında okunur; kurulum değişirse uygulama yeniden açılmalıdır.
 
-## Küçük taşınabilir paket
-
-`python source/tools/package_portable.py <çıktı.zip>` yalnızca uygulama ve VigorLite sahnesinin kullandığı varlıkları paketler. Orijinal GLB, alternatif sahneler, kaynaklar ve Git geçmişi taşınabilir pakete girmez. Kaynak projesindeki orijinaller korunur. ZIP dosyasını çıkarıp `simulasyon/Baslat.cmd` çalıştırın.
-
-## Kontrol bilgisayarı için görünüm
-
-Köprü logosu köprüyle hareket eder; ön koruma kapağı kapalıdır. Kamera sınırı 1200–10000 sahne birimidir. Kanalların koyu iç yüzeyleri hesaplanan kesim çapını veya kaldırılan hacmi değiştirmez. Parçacık efekti yoktur. Hareket 33 ms, değişen malzeme en sık 200 ms aralıkla güncellenir. Pencere küçültülünce simülasyon duraklar. Kontrol bilgisayarındaki performans ayrıca ölçülmelidir.
+Giriş tablasındaki açık iç bölüm ince, düz bir kapakla ve ana tabla altındaki
+dikey açıklık bir kenar kapağıyla kapatılmıştır. Çıkış yüzeyi kapağı üstteki siyah
+tabla kenarına kadar yükseltilmiş ve çevre çerçevesinin arkasına bindirilmiştir.
+Ön/arka redüktörler ve yalnızca onlara ait yüz plakaları, miller ve vidalar
+çıkarılmıştır. Köprü iç duvarındaki dalgalı görünen ince panel, çerçevesi korunarak
+düz bir yüzeyle yenilenmiştir. Yeni kapaklar toplam üç basit kutu geometrisidir;
+görüntü çözünürlüğü ve kesim hesabının ayrıntısı azaltılmamıştır.

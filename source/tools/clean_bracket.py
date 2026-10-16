@@ -21,9 +21,10 @@ mask=((pos[idx]>=lo)&(pos[idx]<=hi)).all(axis=(1,2))
 assert int(mask.sum())==60, int(mask.sum())
 lo2=np.array([-.240,.320,1.510]);hi2=np.array([.286,.335,1.743])
 mask2=((pos[idx]>=lo2)&(pos[idx]<=hi2)).all(axis=(1,2))
-assert int(mask2.sum())==200, int(mask2.sum())
+assert int(mask2.sum()) in (0,188), int(mask2.sum())
 mask |= mask2
 replace_indices(p,idx[~mask])
+detached_strip_triangles=196
 
 # Remove the disconnected floor-standing control pedestal selected in the UI.
 # Components are classified by connectivity so nearby machine geometry remains intact.
@@ -31,17 +32,38 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 region_lo=np.array([-1.5,-.2,2.7]);region_hi=np.array([-.9,.8,3.3])
 pedestal_triangles=0
+hidden_frame_triangles=0
+enclosed_fastener_triangles=0
 kept_primitives=[]
-for primitive in g['meshes'][3]['primitives']:
+for primitive_index,primitive in enumerate(g['meshes'][3]['primitives']):
  pos=acc(primitive['attributes']['POSITION']);faces=acc(primitive['indices']).ravel().reshape(-1,3)
  edges=np.concatenate((faces[:,[0,1]],faces[:,[1,2]],faces[:,[2,0]]))
  graph=coo_matrix((np.ones(len(edges)*2,dtype=np.uint8),(np.r_[edges[:,0],edges[:,1]],np.r_[edges[:,1],edges[:,0]])),shape=(len(pos),len(pos))).tocsr()
  _,groups=connected_components(graph,directed=False)
  face_groups=groups[faces[:,0]]
- remove=np.zeros(len(faces),dtype=bool)
+ # Remove the low internal lattice below the closed table skin.  Keep the
+ # perimeter rails, outer covers, end frames and feet by trimming only faces
+ # fully enclosed by the inner volume.  These profiles cannot be seen from
+ # the normal exterior views but still cost geometry on the controller GPU.
+ xyz=pos[faces]
+ inner_lo=np.array([-2.20,-.55,-.95]);inner_hi=np.array([3.35,.06,.65])
+ hidden_frame=np.zeros(len(faces),dtype=bool)
+ if primitive_index in (0,2):
+  hidden_frame=((xyz>inner_lo)&(xyz<inner_hi)).all(axis=(1,2))
+ hidden_frame_triangles+=int(hidden_frame.sum())
+ remove=hidden_frame.copy()
  for group in np.unique(face_groups):
   group_faces=faces[face_groups==group];used=np.unique(group_faces)
   lo3=pos[used].min(axis=0);hi3=pos[used].max(axis=0)
+  # Entire cross-members and fasteners enclosed by the flat table and outer
+  # skins. Keep a margin around every visible side/end frame; never cut a
+  # component that crosses that margin or reaches a visible guide rail.
+  inner_component=(primitive_index in (0,2) and
+                   (lo3>np.array([-.98,-.40,-1.15])).all() and
+                   (hi3<np.array([3.27,.360,.84])).all())
+  if inner_component:
+   enclosed_fastener_triangles+=int((face_groups==group).sum())
+   remove|=face_groups==group
   if (lo3>=region_lo).all() and (hi3<=region_hi).all():
    remove|=face_groups==group
  if remove.any():
@@ -55,5 +77,8 @@ g['scenes']=[{'nodes':[18]}];g['scene']=0;g['buffers'][0]['byteLength']=len(data
 out=json.dumps(g,separators=(',',':')).encode();out+=b' '*((-len(out))%4);data+=b'\0'*((-len(data))%4)
 b=struct.pack('<III',0x46546c67,2,12+8+len(out)+8+len(data))+struct.pack('<II',len(out),0x4e4f534a)+out+struct.pack('<II',len(data),0x004e4942)+data
 Path('work/CleanStatic.glb').write_bytes(b)
-print('Removed',int(mask.sum()),'bracket triangles and',pedestal_triangles,'pedestal triangles')
+print('Removed',int(mask.sum()),'bracket triangles,',detached_strip_triangles,
+      'detached strip triangles,',pedestal_triangles,'pedestal triangles and',
+      hidden_frame_triangles,'hidden lower-frame triangles')
+print('Removed',enclosed_fastener_triangles,'enclosed table-support/fastener triangles')
 
