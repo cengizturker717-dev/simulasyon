@@ -37,5 +37,5 @@ target_link_libraries(LiveCniChecks PRIVATE Qt6::Core)
 qt_add_executable(PerformanceChecks EXCLUDE_FROM_ALL tools/performance_checks.cpp tools/reference_machining.h tools/reference_pcni.h Motion.h Pcni.h StockGeometry.h Machining.h)
 target_link_libraries(PerformanceChecks PRIVATE Qt6::Quick Qt6::Quick3D)
 
-qt_add_executable(VCutChecks EXCLUDE_FROM_ALL tools/vcut_checks.cpp StockGeometry.h)
+qt_add_executable(VCutChecks EXCLUDE_FROM_ALL tools/vcut_checks.cpp StockGeometry.h Pcni.h)
 target_link_libraries(VCutChecks PRIVATE Qt6::Quick Qt6::Quick3D)
