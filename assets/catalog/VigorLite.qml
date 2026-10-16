@@ -329,8 +329,8 @@ Node {
             position: Qt.vector3d(node.axisX + .08666, .704551, -1.76251)
             source: "meshes/rotarymag_fork.mesh"
             // Pocket 1 faces the tool-change side (+z, toward the spindle); the
-            // others turn by their CrtMAG difference.
-            instancing: MagazineInstances { objectName: "rotaryPocketInstances"; pockets: node.magazinePockets; radial: true; templateAngle: 161.38 }
+            // others turn clockwise (seen from above) by their CrtMAG difference, as on the NcOne magazine page.
+            instancing: MagazineInstances { objectName: "rotaryPocketInstances"; pockets: node.magazinePockets; radial: true; direction: -1; templateAngle: 161.38 }
             materials: [paint__55__55__55__255__material]
         }
         Model {
@@ -338,7 +338,7 @@ Node {
             visible: node.magazineKnown && node.rotaryMagazine
             position: Qt.vector3d(node.axisX + .08666, .704551 + .3569, -1.76251)
             source: "meshes/magazine_holder.mesh"
-            instancing: MagazineInstances { objectName: "rotaryHolderInstances"; pockets: node.magazinePockets; radial: true; occupiedOnly: true; radius: .232 }
+            instancing: MagazineInstances { objectName: "rotaryHolderInstances"; pockets: node.magazinePockets; radial: true; direction: -1; occupiedOnly: true; radius: .232 }
             materials: [paint__0__0__0__255__material]
         }
 

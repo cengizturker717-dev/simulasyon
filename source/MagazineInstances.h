@@ -22,6 +22,8 @@ class MagazineInstances : public QQuick3DInstancing {
     Q_PROPERTY(double radius MEMBER radius NOTIFY magazineChanged)
     Q_PROPERTY(double baseAngle MEMBER baseAngle NOTIFY magazineChanged)
     Q_PROPERTY(double templateAngle MEMBER templateAngle NOTIFY magazineChanged)
+    // +1: CrtMAG grows counter-clockwise seen from above; -1: clockwise.
+    Q_PROPERTY(double direction MEMBER direction NOTIFY magazineChanged)
 public:
     explicit MagazineInstances(QQuick3DObject* parent=nullptr):QQuick3DInstancing(parent) {
         connect(this,&MagazineInstances::magazineChanged,this,[this]{dirty=true;markDirty();});
@@ -49,7 +51,7 @@ private:
                 if(occupiedOnly&&!pocket.value("occupied").toBool())continue;
                 QVector3D position=origin;QVector3D rotation;
                 if(radial) {
-                    double angle=pocket.value("angle").toDouble()-a0;
+                    double angle=direction*(pocket.value("angle").toDouble()-a0);
                     if(!std::isfinite(angle))angle=360.0*index/total;
                     angle+=baseAngle;
                     const double r=angle*3.14159265358979323846/180.0;
@@ -69,6 +71,6 @@ private:
     QVariantList pockets,lastPlacements;
     bool radial=false,occupiedOnly=false,dirty=true;
     QVector3D origin;
-    double radius=0,baseAngle=0,templateAngle=0;
+    double radius=0,baseAngle=0,templateAngle=0,direction=1;
     QByteArray buffer;
 };

@@ -84,8 +84,8 @@ public:
                     {"pocket",pocket},{"magazine",mags.value("NMAG").toInt()},{"type",type},
                     {"angle",mags.value("CrtMAG").toDouble()},{"machineAngle",mags.value("CrMAG").toDouble()},
                     {"x",mags.value("XMAG").toDouble()},{"y",mags.value("YMAG").toDouble()},
-                    {"z",mags.value("ZMAG").toDouble()},{"occupied",false},{"toolId",0},
-                    {"name",QString()},{"diameter",0.0},{"length",0.0}});
+                    {"z",mags.value("ZMAG").toDouble()},{"occupied",false},{"inSpindle",false},{"toolId",0},
+                    {"name",QString()},{"diameter",0.0},{"length",0.0},{"slot",g.mid(4).toInt()}});
             }
             mags.endGroup();
         }
@@ -100,13 +100,33 @@ public:
                 {"maxRpm",tl.value("VMAX").toDouble()},{"workRpm",tl.value("VROT").toDouble()}};
             toolRows.append(row);tl.endGroup();
         }
-        for(auto& value:configuredPockets) {
-            auto pocket=value.toMap();
+        // Live pocket contents: datcmbu ATR_n belongs to datmag CMB_n. UTE names the
+        // tool assigned to the pocket, FL_PRES says whether it is physically there;
+        // an assigned tool that is absent is the one in the spindle. Files whose
+        // ATR rows are missing fall back to the datpunt PMAG assignment.
+        QSettings changer(data+"datcmbu_01_dat.ini",QSettings::IniFormat);
+        auto fillTool=[&](QVariantMap& pocket,const QString& name)->bool{
             for(const auto& toolValue:toolRows) {
                 const auto tool=toolValue.toMap();
+                if(tool.value("name").toString()!=name)continue;
+                pocket["toolId"]=tool.value("id");pocket["diameter"]=tool.value("diameter");pocket["length"]=tool.value("length");
+                return true;
+            }
+            return false;
+        };
+        for(auto& value:configuredPockets) {
+            auto pocket=value.toMap();
+            const QString row=QString("ATR_%1/").arg(pocket.value("slot").toInt(),3,10,QChar('0'));
+            const QString live=changer.value(row+"UTE").toString().trimmed();
+            if(changer.contains(row+"UTE")) {
+                if(!live.isEmpty()) {
+                    const bool present=changer.value(row+"FL_PRES").toInt()!=0;
+                    pocket["name"]=live;pocket["occupied"]=present;pocket["inSpindle"]=!present;fillTool(pocket,live);
+                }
+            } else for(const auto& toolValue:toolRows) {
+                const auto tool=toolValue.toMap();
                 if(tool.value("pocket").toInt()!=pocket.value("pocket").toInt())continue;
-                pocket["occupied"]=true;pocket["toolId"]=tool.value("id");pocket["name"]=tool.value("name");
-                pocket["diameter"]=tool.value("diameter");pocket["length"]=tool.value("length");break;
+                pocket["occupied"]=true;pocket["name"]=tool.value("name");fillTool(pocket,tool.value("name").toString());break;
             }
             value=pocket;magazineRows.append(pocket);
         }
@@ -114,7 +134,7 @@ public:
             auto tool=value.toMap();
             for(const auto& pocketValue:magazineRows) {
                 const auto pocket=pocketValue.toMap();
-                if(tool.value("pocket").toInt()==pocket.value("pocket").toInt()) {tool["magazine"]=pocket.value("magazine");break;}
+                if(tool.value("pocket").toInt()==pocket.value("pocket").toInt()||(!pocket.value("name").toString().isEmpty()&&tool.value("name")==pocket.value("name"))) {tool["magazine"]=pocket.value("magazine");tool["pocket"]=pocket.value("pocket");break;}
             }
             value=tool;
         }
@@ -145,7 +165,7 @@ private:
     int rearLeft=0,rearRight=0,frontLeft=0,frontRight=0,activeMagazineType=0;
     QTimer poll;QString signature;
     QString fileSignature()const{
-        QString s;for(const QString& name:QStringList{"datassi_01_dat.ini","datvari_dat.ini","fametec_dat.ini","datpunt_dat.ini","datmag_01_dat.ini","protmand_dat.ini","datconf_01_dat.ini","datmand_01_dat.ini"}){
+        QString s;for(const QString& name:QStringList{"datassi_01_dat.ini","datvari_dat.ini","fametec_dat.ini","datpunt_dat.ini","datmag_01_dat.ini","datcmbu_01_dat.ini","protmand_dat.ini","datconf_01_dat.ini","datmand_01_dat.ini"}){
             QFileInfo f(base+"/Dati/"+name);s+=name+":"+QString::number(f.size())+":"+QString::number(f.lastModified().toMSecsSinceEpoch())+";";
         }return s;
     }

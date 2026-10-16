@@ -219,16 +219,18 @@ ApplicationWindow {
                     clip: true; spacing: 4; model: dataDialog.visible && dataTabs.currentIndex === 1 ? machineData.magazineTools : []
                     header: Rectangle {
                         width: ListView.view ? ListView.view.width : 0; height: 48; radius: 5; color: "#182536"
-                        Label { anchors.fill: parent; anchors.margins: 10; verticalAlignment: Text.AlignVCenter; font.bold: true; color: "#9ee1b7"; text: machineData.magazineTypeName+" magazin · "+machineData.magazinePocketCount+" yuva · "+machineData.magazineTools.filter(p => p.occupied).length+" dolu" }
+                        Label { anchors.fill: parent; anchors.margins: 10; verticalAlignment: Text.AlignVCenter; font.bold: true; color: "#9ee1b7"; text: machineData.magazineTypeName+" magazin · "+machineData.magazinePocketCount+" yuva · "+machineData.magazineTools.filter(p => p.occupied).length+" dolu"+(machineData.magazineTools.some(p => p.inSpindle) ? " · 1 iş milinde" : "") }
                     }
                     Label { anchors.centerIn: parent; visible: machineData.magazineTools.length===0; text: "Dati dosyasında etkin magazin yuvası bulunamadı"; color: "#edbe75" }
                     delegate: Rectangle {
                         required property var modelData
-                        width: ListView.view.width; height: 48; radius: 5; color: modelData.occupied ? "#253c35" : "#202833"
+                        width: ListView.view.width; height: 48; radius: 5; color: modelData.occupied ? "#253c35" : modelData.inSpindle ? "#1d3350" : "#202833"
                         Label {
                             anchors.fill: parent; anchors.margins: 9; verticalAlignment: Text.AlignVCenter
-                            color: modelData.occupied ? "#e5edf7" : "#8695a6"
-                            text: "Cep "+modelData.pocket+"   "+(modelData.occupied ? "T"+modelData.toolId+" · "+modelData.name+"   Ø"+modelData.diameter.toFixed(2)+" · L "+modelData.length.toFixed(2)+" mm" : "Boş")
+                            color: modelData.occupied ? "#e5edf7" : modelData.inSpindle ? "#82afff" : "#8695a6"
+                            text: "Cep "+modelData.pocket+"   "+(modelData.occupied || modelData.inSpindle
+                                ? (modelData.toolId ? "T"+modelData.toolId+" · " : "")+modelData.name+(modelData.toolId ? "   Ø"+modelData.diameter.toFixed(2)+" · L "+modelData.length.toFixed(2)+" mm" : "")+(modelData.inSpindle ? "   · iş milinde" : "")
+                                : "Boş")
                         }
                     }
                 }
@@ -254,15 +256,57 @@ ApplicationWindow {
         contentItem: ColumnLayout {
             RowLayout {
                 Layout.fillWidth: true
-                ComboBox { id: programChoice; Layout.fillWidth: true; model: pcni.programs }
-                Button { text: "Programı oku"; enabled: programChoice.currentIndex>=0; onClicked: {motion.clearPath();pcni.load(programChoice.currentText)} }
-                Button { text: "Yenile"; onClicked: {motion.clearPath();pcni.refresh()} }
+                Label { Layout.fillWidth: true; text: pcni.root + "/User/Prog"; elide: Text.ElideMiddle; color: "#b6c4d6" }
+                Button { text: "Yenile"; onClicked: {motion.clearPath();programTree.collapsed={};pcni.refresh()} }
                 Button { text: "Klasör seç"; onClicked: machineFolder.open() }
             }
-            Label { Layout.fillWidth: true; text: pcni.root; elide: Text.ElideMiddle; color: "#b6c4d6" }
-            Label { Layout.fillWidth: true; text: pcni.name + "\n" + pcni.status; wrapMode: Text.Wrap }
+            Label { Layout.fillWidth: true; text: (pcni.path.length ? pcni.path : pcni.name) + "\n" + pcni.status; wrapMode: Text.Wrap }
             RowLayout {
                 Layout.fillWidth: true; Layout.fillHeight: true
+                // Program tree as on the controller: folders open/close, a click
+                // previews a program, a double click puts its panel on the table.
+                Rectangle {
+                    Layout.preferredWidth: 270; Layout.fillHeight: true; color: "#182130"; radius: 4
+                    ListView {
+                        id: programTree
+                        property var collapsed: ({})
+                        function hidden(row) {
+                            for (let p=row.parent; p.length; p=p.lastIndexOf("/")>=0 ? p.slice(0,p.lastIndexOf("/")) : "")
+                                if (collapsed[p]) return true
+                            return false
+                        }
+                        anchors.fill: parent; anchors.margins: 4; clip: true
+                        model: programDialog.visible ? pcni.tree : []
+                        ScrollBar.vertical: ScrollBar {}
+                        header: Label { width: ListView.view.width; height: 26; leftPadding: 6; verticalAlignment: Text.AlignVCenter; text: "PROGRAM · " + pcni.programs.length; color: "#9ee1b7"; font.bold: true }
+                        delegate: Rectangle {
+                            required property var modelData
+                            readonly property bool shown: !programTree.hidden(modelData)
+                            readonly property bool current: !modelData.folder && modelData.path === pcni.path
+                            width: ListView.view.width; height: shown ? 26 : 0; visible: shown
+                            color: current ? "#2b4a7a" : rowArea.containsMouse ? "#22304a" : "transparent"; radius: 3
+                            Label {
+                                anchors.fill: parent; leftPadding: 6 + modelData.depth*16; verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight
+                                text: modelData.folder ? (programTree.collapsed[modelData.path] ? "▸ " : "▾ ") + modelData.name : "▷ " + modelData.name
+                                color: modelData.folder ? "#edbe75" : current ? "#ffffff" : "#d6e0ec"
+                            }
+                            MouseArea {
+                                id: rowArea; anchors.fill: parent; hoverEnabled: true
+                                onClicked: {
+                                    if (modelData.folder) {
+                                        let c=Object.assign({}, programTree.collapsed); c[modelData.path]=!c[modelData.path]; programTree.collapsed=c
+                                    } else { motion.clearPath(); pcni.load(modelData.path) }
+                                }
+                                onDoubleClicked: {
+                                    if (modelData.folder) return
+                                    motion.clearPath()
+                                    if (pcni.load(modelData.path) && pcni.ready && pcni.thickness>0 && machining.load()) { root.homeView(); programDialog.close() }
+                                }
+                            }
+                        }
+                        Label { anchors.centerIn: parent; visible: pcni.programs.length===0; text: "Program klasöründe PCNI yok"; color: "#edbe75" }
+                    }
+                }
                 Rectangle {
                     Layout.fillWidth: true; Layout.fillHeight: true; color: "#202833"
                     Canvas {
@@ -300,7 +344,7 @@ ApplicationWindow {
                     }
                 }
             }
-            Label { Layout.fillWidth: true; text: "Mavi: kesim yolu · Gri: geçiş · Numaralar: etiket konumları\nPRF / Z / ZI derinlikleri ve takım kütüphanesindeki çaplar uygulanır."; wrapMode: Text.Wrap }
+            Label { Layout.fillWidth: true; text: "Soldan program seç: tek tık önizler, çift tık plakayı tablaya yükler.\nMavi: kesim yolu · Gri: geçiş · Numaralar: etiket konumları · PRF / Z / ZI derinlikleri ve takım çapları uygulanır."; wrapMode: Text.Wrap }
             Button {
                 text: "Plakayı makine tablasına yükle"; enabled: pcni.ready && pcni.thickness>0
                 onClicked: {

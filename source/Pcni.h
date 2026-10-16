@@ -8,6 +8,7 @@
 #include <QSettings>
 #include <QVariantList>
 #include <cmath>
+#include <functional>
 
 // Read-only interpreter of the installed vertical PON/PUP and G99 cycles.
 // Depth is positive downwards from the panel top; CNI Z is LZ+Z.
@@ -15,6 +16,8 @@ class Pcni : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString root READ root WRITE setRoot NOTIFY changed)
     Q_PROPERTY(QStringList programs READ programs NOTIFY changed)
+    Q_PROPERTY(QVariantList tree READ tree NOTIFY changed)
+    Q_PROPERTY(QString path READ selectedPath NOTIFY changed)
     Q_PROPERTY(QString name MEMBER selected NOTIFY changed)
     Q_PROPERTY(QString status MEMBER message NOTIFY changed)
     Q_PROPERTY(QVariantList points MEMBER path NOTIFY changed)
@@ -31,10 +34,33 @@ public:
     double workLength()const{return panelLimit;}
     void setWorkLength(double length){if(length>=2800&&length<=4200&&length!=panelLimit){panelLimit=length;refresh();}}
     QStringList programs() const { return files; }
+    QVariantList tree() const { return rows; }
+    QString selectedPath() const { return selectedRelative; }
     void setRoot(const QString& value) { directory=value; refresh(); }
     Q_INVOKABLE void refresh() {
-        files=QDir(directory+"/User/Prog").entryList({"*.pcni",QStringLiteral("*.pcn\u0131")},QDir::Files,QDir::Name);
-        valid=false;path.clear();tags.clear();selected.clear();
+        // Programs may sit in sub-folders of User/Prog (as NcOne shows them).
+        // `files` holds paths relative to User/Prog; `rows` is the folder tree,
+        // folders before files at every level, like the controller's list.
+        files.clear();rows.clear();
+        const QDir base(directory+"/User/Prog");
+        const QStringList filters{"*.pcni",QStringLiteral("*.pcnı")};
+        std::function<void(const QString&,int)> walk=[&](const QString& relative,int depth){
+            const QDir folder(relative.isEmpty()?base.path():base.filePath(relative));
+            for(const QString& sub:folder.entryList(QDir::Dirs|QDir::NoDotAndDotDot,QDir::Name|QDir::IgnoreCase)) {
+                const QString path=relative.isEmpty()?sub:relative+"/"+sub;
+                const int before=rows.size();
+                rows.append(QVariantMap{{"name",sub},{"path",path},{"folder",true},{"depth",depth},{"parent",relative}});
+                walk(path,depth+1);
+                if(rows.size()==before+1)rows.removeLast();   // hide folders without programs
+            }
+            for(const QString& name:folder.entryList(filters,QDir::Files,QDir::Name|QDir::IgnoreCase)) {
+                const QString path=relative.isEmpty()?name:relative+"/"+name;
+                files.append(path);
+                rows.append(QVariantMap{{"name",name},{"path",path},{"folder",false},{"depth",depth},{"parent",relative}});
+            }
+        };
+        if(base.exists())walk(QString(),0);
+        valid=false;path.clear();tags.clear();selected.clear();selectedRelative.clear();
         message=QString::number(files.size())+" PCNI programı";emit changed();
     }
     Q_INVOKABLE bool load(const QString& file) {
@@ -46,8 +72,15 @@ public:
         normalized.replace(QStringLiteral("\u00C4\u00B0"),QStringLiteral("\u0130"));
         selected=QFileInfo(normalized).fileName();
         const QString folder=QDir(directory+"/User/Prog").canonicalPath();
-        const QString actual=QFileInfo(QDir::isAbsolutePath(normalized)?normalized:folder+"/"+normalized).canonicalFilePath();
-        if(folder.isEmpty()||actual.isEmpty()||QFileInfo(actual).canonicalPath().compare(folder,Qt::CaseInsensitive)!=0) return reject("Program klasöründe bulunamadı");
+        QString actual=QFileInfo(QDir::isAbsolutePath(normalized)?normalized:folder+"/"+normalized).canonicalFilePath();
+        // The controller reports a bare file name; prefer User/Prog itself, then
+        // the first match in its sub-folders (tree order).
+        if(actual.isEmpty()&&!folder.isEmpty()&&!normalized.contains('/')&&!normalized.contains('\\'))
+            for(const QString& candidate:files)
+                if(QFileInfo(candidate).fileName().compare(normalized,Qt::CaseInsensitive)==0){actual=QFileInfo(folder+"/"+candidate).canonicalFilePath();break;}
+        // Only files inside User/Prog (any depth) are read.
+        if(folder.isEmpty()||actual.isEmpty()||!actual.startsWith(folder+"/",Qt::CaseInsensitive)) return reject("Program klasöründe bulunamadı");
+        selectedRelative=actual.mid(folder.size()+1);
         QFile input(actual);
         if(!input.open(QIODevice::ReadOnly)||input.size()>10*1024*1024) return reject("Program okunamadı veya çok büyük");
         QSettings tools(directory+"/Dati/datpunt_dat.ini",QSettings::IniFormat);
@@ -166,7 +199,7 @@ private:
     }
     bool reject(const QString& reason){valid=false;path.clear();message=reason;emit changed();return false;}
     QString directory="C:/CNI/Ncone/MachineData/POYRAZ_VIGOR2136_ETH";
-    QStringList files;QString selected,message;QVariantList path,tags;
+    QStringList files;QVariantList rows;QString selected,selectedRelative,message;QVariantList path,tags;
     double sx=0,sy=0,sz=0,toolDia=0;int holesCount=0;bool valid=false;
     double panelLimit=3660;
 };

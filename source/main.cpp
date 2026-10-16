@@ -29,6 +29,8 @@
 #include "tools/visual_performance_checks.h"
 #include "tools/drill_rig_checks.h"
 #include "tools/pose_capture_checks.h"
+#include <QJsonArray>
+#include <QJsonDocument>
 
 int main(int argc,char **argv) {
     QGuiApplication app(argc,argv);
@@ -220,7 +222,23 @@ int main(int argc,char **argv) {
     }
     const int poseCaptureIndex=args.indexOf("--pose-capture");
     if(poseCaptureIndex>=0){
-        QTimer::singleShot(2000,&app,[&]{app.exit(runPoseCaptures(window,profile,motion,args.value(poseCaptureIndex+1),args.value(poseCaptureIndex+2)));});
+        QTimer::singleShot(2000,&app,[&]{
+            const int result=runPoseCaptures(window,profile,motion,args.value(poseCaptureIndex+1),args.value(poseCaptureIndex+2));
+            // The magazine rows the data dialog lists, for offline review.
+            QFile rows(args.value(poseCaptureIndex+1)+"/magazine.json");
+            if(rows.open(QIODevice::WriteOnly))rows.write(QJsonDocument(QJsonArray::fromVariantList(machineData.magazineTools())).toJson());
+            app.exit(result);
+        });
+        return app.exec();
+    }
+    // Offline review of the program dialog: --dialog-capture <png> [program path]
+    const int dialogCaptureIndex=args.indexOf("--dialog-capture");
+    if(dialogCaptureIndex>=0){
+        QTimer::singleShot(2000,&app,[&]{
+            QMetaObject::invokeMethod(window,"showPcni");
+            if(dialogCaptureIndex+2<args.size())pcni.load(args.value(dialogCaptureIndex+2));
+            QTimer::singleShot(1500,&app,[&]{app.exit(window->grabWindow().save(args.value(dialogCaptureIndex+1))?0:1);});
+        });
         return app.exec();
     }
     const int drillRigIndex=args.indexOf("--drill-rig-test");
